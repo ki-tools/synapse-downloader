@@ -1,0 +1,12 @@
+language: python
+python:
+  - "3.7"
+before_install:
+  - export BOTO_CONFIG=/dev/null
+install:
+  - pip install pipenv
+  - pipenv install --dev
+script:
+  - pipenv run pytest --cov -v
+after_success:
+  - coveralls
