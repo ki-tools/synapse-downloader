@@ -75,8 +75,6 @@ class SynapseDownloaderFileViewNoAio:
 
         self._start(parent, self._download_path)
 
-        self.download_view.delete()
-
         self.end_time = datetime.now()
         logging.info('')
         logging.info('Run time: {0}'.format(self.end_time - self.start_time))
@@ -90,6 +88,7 @@ class SynapseDownloaderFileViewNoAio:
             pass
 
     def _download_children(self, parent, local_path):
+        syn_folders = []
         syn_files = []
 
         for child in self._get_children(parent):
@@ -97,7 +96,7 @@ class SynapseDownloaderFileViewNoAio:
             child_name = child.get('name')
 
             if child.get('type') == 'org.sagebionetworks.repo.model.Folder':
-                self._download_folder(child_id, child_name, local_path)
+                syn_folders.append({'id': child_id, 'name': child_name, 'local_path': local_path})
             else:
                 syn_files.append(child_id)
 
@@ -109,6 +108,10 @@ class SynapseDownloaderFileViewNoAio:
                     'Parent: {0} - Files: {1} - Handles: {2}'.format(parent_id, len(syn_files), len(file_handles)))
                 raise Exception('File Handle count does not match File Count.')
             self._download_filehandles(file_handles, local_path)
+
+        if syn_folders:
+            for syn_folder in syn_folders:
+                self._download_folder(syn_folder['id'], syn_folder['name'], syn_folder['local_path'])
 
     def _get_filehandles(self, file_ids):
         uri = '/fileHandle/batch'

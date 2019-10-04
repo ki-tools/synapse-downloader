@@ -56,12 +56,15 @@ class SynapseDownloaderOld:
         logging.info('')
 
         self.download_children(parent, self._download_path)
-        
+
         self.end_time = datetime.now()
         logging.info('')
         logging.info('Run time: {0}'.format(self.end_time - self.start_time))
 
     def download_children(self, parent, local_path):
+        syn_folders = []
+        syn_files = []
+
         try:
             children = self._synapse_client.getChildren(parent, includeTypes=["folder", "file"])
 
@@ -70,9 +73,20 @@ class SynapseDownloaderOld:
                 child_name = child.get('name')
 
                 if child.get('type') == 'org.sagebionetworks.repo.model.Folder':
-                    self.download_folder(child_id, child_name, local_path)
+                    # self.download_folder(child_id, child_name, local_path)
+                    syn_folders.append({'id': child_id, 'name': child_name, 'local_path': local_path})
                 else:
-                    self.download_file(child_id, child_name, local_path)
+                    # self.download_file(child_id, child_name, local_path)
+                    syn_files.append({'id': child_id, 'name': child_name, 'local_path': local_path})
+
+            if syn_files:
+                for syn_file in syn_files:
+                    self.download_file(syn_file['id'], syn_file['name'], syn_file['local_path'])
+
+            if syn_folders:
+                for syn_folder in syn_folders:
+                    self.download_folder(syn_folder['id'], syn_folder['name'], syn_folder['local_path'])
+
         except Exception as ex:
             logging.exception(ex)
 

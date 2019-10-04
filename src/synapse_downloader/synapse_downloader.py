@@ -86,6 +86,7 @@ class SynapseDownloader:
             await self._aiosession.close()
 
     async def _download_children(self, parent, local_path):
+        syn_folders = []
         syn_files = []
 
         for child in await self._get_children(parent):
@@ -93,7 +94,7 @@ class SynapseDownloader:
             child_name = child.get('name')
 
             if child.get('type') == 'org.sagebionetworks.repo.model.Folder':
-                await self._download_folder(child_id, child_name, local_path)
+                syn_folders.append({'id': child_id, 'name': child_name, 'local_path': local_path})
             else:
                 syn_files.append(child_id)
 
@@ -105,6 +106,10 @@ class SynapseDownloader:
                     'Parent: {0} - Files: {1} - Handles: {2}'.format(parent_id, len(syn_files), len(file_handles)))
                 raise Exception('File Handle count does not match File Count.')
             await self._download_filehandles(file_handles, local_path)
+
+        if syn_folders:
+            for syn_folder in syn_folders:
+                await self._download_folder(syn_folder['id'], syn_folder['name'], syn_folder['local_path'])
 
     async def _get_filehandles(self, file_ids):
         uri = '/fileHandle/batch'

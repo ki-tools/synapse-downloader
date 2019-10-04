@@ -28,12 +28,15 @@ class SynapseDownloaderFileView:
         self.download_view = None
         self._aiosession = None
 
+        self.total_files = 0
+        self.files_processed = 0
+
         self.start_time = None
         self.end_time = None
 
         var_path = os.path.expandvars(download_path)
         expanded_path = os.path.expanduser(var_path)
-        self._download_path = expanded_path
+        self._download_path = os.path.abspath(expanded_path)
         self.ensure_dirs(self._download_path)
 
     def synapse_login(self):
@@ -66,6 +69,9 @@ class SynapseDownloaderFileView:
     def execute(self):
         self.start_time = datetime.now()
 
+        self.total_files = 0
+        self.files_processed = 0
+
         self.synapse_login()
         parent = self._synapse_client.get(self._starting_entity_id, downloadFile=False)
         if type(parent) not in [syn.Project, syn.Folder]:
@@ -76,10 +82,10 @@ class SynapseDownloaderFileView:
 
         self.project = SynapseParentIter(self._synapse_client, parent).get_project()
         self.download_view = DownloadFileView(self._synapse_client, self.project).load()
+        self.total_files = len(self.download_view)
+        logging.info('Total files: {0}'.format(self.total_files))
 
         asyncio.run(self._start(parent, self._download_path))
-
-        self.download_view.delete()
 
         self.end_time = datetime.now()
         logging.info('')
@@ -91,10 +97,12 @@ class SynapseDownloaderFileView:
             await self._download_children(parent, local_path)
         except Exception as ex:
             logging.exception(ex)
+            raise
         finally:
             await self._aiosession.close()
 
     async def _download_children(self, parent, local_path):
+        syn_folders = []
         syn_files = []
 
         for child in await self._get_children(parent):
@@ -102,7 +110,7 @@ class SynapseDownloaderFileView:
             child_name = child.get('name')
 
             if child.get('type') == 'org.sagebionetworks.repo.model.Folder':
-                await self._download_folder(child_id, child_name, local_path)
+                syn_folders.append({'id': child_id, 'name': child_name, 'local_path': local_path})
             else:
                 syn_files.append(child_id)
 
@@ -114,6 +122,10 @@ class SynapseDownloaderFileView:
                     'Parent: {0} - Files: {1} - Handles: {2}'.format(parent_id, len(syn_files), len(file_handles)))
                 raise Exception('File Handle count does not match File Count.')
             await self._download_filehandles(file_handles, local_path)
+
+        if syn_folders:
+            for syn_folder in syn_folders:
+                await self._download_folder(syn_folder['id'], syn_folder['name'], syn_folder['local_path'])
 
     async def _get_filehandles(self, file_ids):
         uri = '/fileHandle/batch'
@@ -163,8 +175,12 @@ class SynapseDownloaderFileView:
             await self._download_file(url, filename, remote_md5, content_size, local_path)
 
     async def _download_file(self, url, name, remote_md5, remote_size, local_path):
+        self.files_processed += 1
         full_path = os.path.join(local_path, name)
-        logging.info('File  : {0} -> {1}'.format('--', full_path))
+        logging.info('File  : {0} -> {1} [{2} of {3}]'.format(full_path.replace(self._download_path, ''),
+                                                              full_path,
+                                                              self.files_processed,
+                                                              self.total_files))
 
         if os.path.isfile(full_path):
             logging.info('  File exists, checking MD5...')
@@ -219,6 +235,6 @@ class SynapseDownloaderFileView:
 
     async def _download_folder(self, syn_id, name, local_path):
         full_path = os.path.join(local_path, name)
-        logging.info('Folder: {0} -> {1}'.format(syn_id, full_path))
+        logging.info('Folder: {0} -> {1}'.format(full_path.replace(self._download_path, ''), full_path))
         self.ensure_dirs(full_path)
         await self._download_children(syn_id, full_path)

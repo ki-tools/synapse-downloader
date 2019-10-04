@@ -15,19 +15,28 @@ class DownloadFileView(dict):
         self.view = None
 
     def load(self):
-        self._ensure_view()
-        query = self.syn_client.tableQuery('SELECT * FROM {0}'.format(self.view.id))
+        try:
+            self._ensure_view()
+            logging.info('Querying file view...')
+            query = self.syn_client.tableQuery('SELECT * FROM {0}'.format(self.view.id))
 
-        id_col = self._get_table_column_index(query.headers, self.COL_ID)
-        col_parentid = self._get_table_column_index(query.headers, self.COL_PARENTID)
-        col_datafilehandleid = self._get_table_column_index(query.headers, self.COL_DATAFILEHANDLEID)
+            id_col = self._get_table_column_index(query.headers, self.COL_ID)
+            col_parentid = self._get_table_column_index(query.headers, self.COL_PARENTID)
+            col_datafilehandleid = self._get_table_column_index(query.headers, self.COL_DATAFILEHANDLEID)
 
-        for row in query:
-            self[row[id_col]] = {
-                self.COL_ID: row[id_col],
-                self.COL_PARENTID: row[col_parentid],
-                self.COL_DATAFILEHANDLEID: row[col_datafilehandleid]
-            }
+            logging.info('Loading file view...')
+            for row in query:
+                self[row[id_col]] = {
+                    self.COL_ID: row[id_col],
+                    self.COL_PARENTID: row[col_parentid],
+                    self.COL_DATAFILEHANDLEID: row[col_datafilehandleid]
+                }
+        except Exception as ex:
+            logging.exception(ex)
+            raise
+        finally:
+            self.delete()
+
         return self
 
     def _get_table_column_index(self, headers, column_name):
