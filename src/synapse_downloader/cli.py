@@ -21,11 +21,20 @@ def main(args=None):
     args = parser.parse_args(args)
 
     log_level = getattr(logging, args.log_level.upper())
+    log_filename = 'log.txt'
 
     logging.basicConfig(
-        format='%(message)s',
+        filename=log_filename,
+        filemode='w',
+        format='%(asctime)s %(levelname)s: %(message)s',
         level=log_level
     )
+
+    # Add console logging.
+    console = logging.StreamHandler()
+    console.setLevel(log_level)
+    console.setFormatter(logging.Formatter('%(message)s'))
+    logging.getLogger().addHandler(console)
 
     if args.strategy == 'old':
         SynapseDownloaderOld(args.entity_id,

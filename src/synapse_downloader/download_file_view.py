@@ -8,7 +8,6 @@ class DownloadFileView(dict):
     COL_ID = 'id'
     COL_PARENTID = 'parentId'
     COL_DATAFILEHANDLEID = 'dataFileHandleId'
-    ALL_COLUMNS = [COL_ID, COL_PARENTID, COL_DATAFILEHANDLEID]
 
     def __init__(self, syn_client, project):
         self.syn_client = syn_client
@@ -39,7 +38,7 @@ class DownloadFileView(dict):
                 return index
 
     def _ensure_view(self):
-        logging.info('Creating file view...')
+        logging.info('Creating file view: {0}'.format(self.VIEW_NAME))
         cols = [
             syn.Column(name=self.COL_ID, columnType='ENTITYID'),
             syn.Column(name=self.COL_PARENTID, columnType='ENTITYID'),
@@ -57,4 +56,5 @@ class DownloadFileView(dict):
 
     def delete(self):
         if self.view:
+            logging.info('Deleting file view: {0}'.format(self.VIEW_NAME))
             self.syn_client.delete(self.view)

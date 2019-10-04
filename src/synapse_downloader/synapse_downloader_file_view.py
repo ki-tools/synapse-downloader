@@ -64,6 +64,8 @@ class SynapseDownloaderFileView:
             os.makedirs(local_path)
 
     def execute(self):
+        self.start_time = datetime.now()
+
         self.synapse_login()
         parent = self._synapse_client.get(self._starting_entity_id, downloadFile=False)
         if type(parent) not in [syn.Project, syn.Folder]:
@@ -75,14 +77,13 @@ class SynapseDownloaderFileView:
         self.project = SynapseParentIter(self._synapse_client, parent).get_project()
         self.download_view = DownloadFileView(self._synapse_client, self.project).load()
 
-        self.start_time = datetime.now()
         asyncio.run(self._start(parent, self._download_path))
-        self.end_time = datetime.now()
 
         self.download_view.delete()
 
-        print('')
-        print('Run time: {0}'.format(self.end_time - self.start_time))
+        self.end_time = datetime.now()
+        logging.info('')
+        logging.info('Run time: {0}'.format(self.end_time - self.start_time))
 
     async def _start(self, parent, local_path):
         try:
@@ -166,10 +167,13 @@ class SynapseDownloaderFileView:
         logging.info('File  : {0} -> {1}'.format('--', full_path))
 
         if os.path.isfile(full_path):
+            logging.info('  File exists, checking MD5...')
             local_md5 = await self._get_md5(full_path)
             if local_md5 == remote_md5:
                 logging.info('  Local file matches remote file. Skipping...')
                 return None
+            else:
+                logging.info('  Local file does not match remote file. Downloading...')
 
         async with self._aiosession.get(url) as response:
             async with aiofiles.open(full_path, mode='wb') as fd:
@@ -185,6 +189,7 @@ class SynapseDownloaderFileView:
                     sys.stdout.flush()
                     await fd.write(chunk)
                 print('')
+                logging.info('  Saved {0} bytes'.format(chunk_size_read))
 
     async def _get_md5(self, local_path):
         md5 = hashlib.md5()
