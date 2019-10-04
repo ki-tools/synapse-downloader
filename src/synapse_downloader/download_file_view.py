@@ -16,7 +16,7 @@ class DownloadFileView(dict):
 
     def load(self):
         try:
-            self._ensure_view()
+            self._create()
             logging.info('Querying file view...')
             query = self.syn_client.tableQuery('SELECT * FROM {0}'.format(self.view.id))
 
@@ -46,7 +46,7 @@ class DownloadFileView(dict):
             if item.name == column_name:
                 return index
 
-    def _ensure_view(self):
+    def _create(self):
         logging.info('Creating file view: {0}'.format(self.VIEW_NAME))
         cols = [
             syn.Column(name=self.COL_ID, columnType='ENTITYID'),
@@ -62,6 +62,8 @@ class DownloadFileView(dict):
                                       addDefaultViewColumns=False,
                                       addAnnotationColumns=False)
         self.view = self.syn_client.store(schema)
+
+        return self.view
 
     def delete(self):
         if self.view:

@@ -7,11 +7,12 @@ from functools import partial
 import logging
 import aiohttp
 import aiofiles
-from datetime import datetime
+from datetime import datetime, time
 import hashlib
 from .syn_parent_iter import SynapseParentIter
 from .download_file_view import DownloadFileView
 from .utils import Utils
+import random
 
 
 class SynapseDownloaderFileView:
@@ -30,6 +31,7 @@ class SynapseDownloaderFileView:
 
         self.total_files = 0
         self.files_processed = 0
+        self.has_errors = False
 
         self.start_time = None
         self.end_time = None
@@ -71,6 +73,7 @@ class SynapseDownloaderFileView:
 
         self.total_files = 0
         self.files_processed = 0
+        self.has_errors = False
 
         self.synapse_login()
         parent = self._synapse_client.get(self._starting_entity_id, downloadFile=False)
@@ -91,13 +94,18 @@ class SynapseDownloaderFileView:
         logging.info('')
         logging.info('Run time: {0}'.format(self.end_time - self.start_time))
 
+        if self.has_errors:
+            logging.error('Finished with errors. Please see log file.')
+        else:
+            logging.info('Finished successfully.')
+
     async def _start(self, parent, local_path):
         try:
             self._aiosession = aiohttp.ClientSession()
             await self._download_children(parent, local_path)
         except Exception as ex:
             logging.exception(ex)
-            raise
+            self.has_errors = True
         finally:
             await self._aiosession.close()
 
@@ -162,8 +170,23 @@ class SynapseDownloaderFileView:
         return results
 
     async def _restPost(self, uri, headers, body=None):
-        async with self._aiosession.post(uri, headers=headers, json=body) as response:
-            return await response.json()
+        max_attempts = 5
+        attempt_number = 0
+        while True:
+            try:
+                async with self._aiosession.post(uri, headers=headers, json=body) as response:
+                    return await response.json()
+            except Exception as ex:
+                logging.exception(ex)
+                attempt_number += 1
+                if attempt_number < max_attempts:
+                    sleep_time = random.randint(1, 5)
+                    logging.error('  Retrying POST in: {0}'.format(sleep_time))
+                    await asyncio.sleep(sleep_time)
+                else:
+                    self.has_errors = True
+                    logging.error('  Failed POST file: {0}'.format(uri))
+                    return []
 
     async def _download_filehandles(self, filehandles, local_path):
         for filehandle in filehandles:
@@ -191,21 +214,37 @@ class SynapseDownloaderFileView:
             else:
                 logging.info('  Local file does not match remote file. Downloading...')
 
-        async with self._aiosession.get(url) as response:
-            async with aiofiles.open(full_path, mode='wb') as fd:
-                chunk_size_read = 0
-                while True:
-                    chunk = await response.content.read(self.CHUNK_SIZE)
-                    if not chunk:
+        max_attempts = 5
+        attempt_number = 0
+        while True:
+            try:
+                async with self._aiosession.get(url) as response:
+                    async with aiofiles.open(full_path, mode='wb') as fd:
+                        chunk_size_read = 0
+                        while True:
+                            chunk = await response.content.read(self.CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            chunk_size_read += len(chunk)
+                            sys.stdout.write('\r')
+                            sys.stdout.flush()
+                            sys.stdout.write('  Saving chunk {0} of {1}'.format(chunk_size_read, remote_size))
+                            sys.stdout.flush()
+                            await fd.write(chunk)
+                        print('')
+                        logging.info('  Saved {0} bytes'.format(chunk_size_read))
                         break
-                    chunk_size_read += len(chunk)
-                    sys.stdout.write('\r')
-                    sys.stdout.flush()
-                    sys.stdout.write('  Saving chunk {0} of {1}'.format(chunk_size_read, remote_size))
-                    sys.stdout.flush()
-                    await fd.write(chunk)
-                print('')
-                logging.info('  Saved {0} bytes'.format(chunk_size_read))
+            except Exception as ex:
+                logging.exception(ex)
+                attempt_number += 1
+                if attempt_number < max_attempts:
+                    sleep_time = random.randint(1, 5)
+                    logging.error('  Retrying file in: {0}'.format(sleep_time))
+                    await asyncio.sleep(sleep_time)
+                else:
+                    self.has_errors = True
+                    logging.error('  Failed to download file: {0}'.format(full_path))
+                    break
 
     async def _get_md5(self, local_path):
         md5 = hashlib.md5()

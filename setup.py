@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="synapse-downloader",
-    version="0.0.b14",
+    version="0.0.b15",
     author="Patrick Stout",
     author_email="pstout@prevagroup.com",
     license="Apache2",
