@@ -1,5 +1,6 @@
 import uuid
 import logging
+from .synapse_proxy import SynapseProxy
 import synapseclient as syn
 
 
@@ -9,15 +10,13 @@ class DownloadFileView(dict):
     COL_PARENTID = 'parentId'
     COL_DATAFILEHANDLEID = 'dataFileHandleId'
 
-    def __init__(self, syn_client, project, scope):
+    def __init__(self, project, scope):
         """
 
         Args:
-            syn_client: Synapseclient to use.
             project: The project the view will live under.
             scope: The Project or Folder to scope the view to.
         """
-        self.syn_client = syn_client
         self.project = project
         self.scope = scope
         self.view = None
@@ -26,7 +25,7 @@ class DownloadFileView(dict):
         try:
             self._create()
             logging.info('Querying file view...')
-            query = self.syn_client.tableQuery('SELECT * FROM {0}'.format(self.view.id))
+            query = SynapseProxy.client().tableQuery('SELECT * FROM {0}'.format(self.view.id))
 
             id_col = self._get_table_column_index(query.headers, self.COL_ID)
             col_parentid = self._get_table_column_index(query.headers, self.COL_PARENTID)
@@ -69,11 +68,11 @@ class DownloadFileView(dict):
                                       includeEntityTypes=[syn.EntityViewType.FILE],
                                       addDefaultViewColumns=False,
                                       addAnnotationColumns=False)
-        self.view = self.syn_client.store(schema)
+        self.view = SynapseProxy.client().store(schema)
 
         return self.view
 
     def delete(self):
         if self.view:
             logging.info('Deleting file view: {0}'.format(self.VIEW_NAME))
-            self.syn_client.delete(self.view)
+            SynapseProxy.client().delete(self.view)
