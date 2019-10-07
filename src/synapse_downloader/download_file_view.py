@@ -9,9 +9,17 @@ class DownloadFileView(dict):
     COL_PARENTID = 'parentId'
     COL_DATAFILEHANDLEID = 'dataFileHandleId'
 
-    def __init__(self, syn_client, project):
+    def __init__(self, syn_client, project, scope):
+        """
+
+        Args:
+            syn_client: Synapseclient to use.
+            project: The project the view will live under.
+            scope: The Project or Folder to scope the view to.
+        """
         self.syn_client = syn_client
         self.project = project
+        self.scope = scope
         self.view = None
 
     def load(self):
@@ -57,7 +65,7 @@ class DownloadFileView(dict):
                                       columns=cols,
                                       properties=None,
                                       parent=self.project,
-                                      scopes=[self.project],
+                                      scopes=[self.scope],
                                       includeEntityTypes=[syn.EntityViewType.FILE],
                                       addDefaultViewColumns=False,
                                       addAnnotationColumns=False)

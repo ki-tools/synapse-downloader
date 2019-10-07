@@ -57,7 +57,7 @@ class SynapseDownloaderFileView:
         logging.info('Downloading to: {0}'.format(self._download_path))
 
         self.project = SynapseParentIter(self._synapse_client, parent).get_project()
-        self.download_view = DownloadFileView(self._synapse_client, self.project).load()
+        self.download_view = DownloadFileView(self._synapse_client, self.project, scope=parent).load()
         self.total_files = len(self.download_view)
         logging.info('Total files: {0}'.format(self.total_files))
 
