@@ -30,7 +30,7 @@ class SynapseDownloader:
         var_path = os.path.expandvars(download_path)
         expanded_path = os.path.expanduser(var_path)
         self._download_path = expanded_path
-        self.ensure_dirs(self._download_path)
+        Utils.ensure_dirs(self._download_path)
 
     def synapse_login(self):
         logging.info('Logging into Synapse...')
@@ -54,10 +54,6 @@ class SynapseDownloader:
             logging.error('Synapse login failed: {0}'.format(str(ex)))
 
         return self._synapse_client is not None
-
-    def ensure_dirs(self, local_path):
-        if not os.path.isdir(local_path):
-            os.makedirs(local_path)
 
     def execute(self):
         self.start_time = datetime.now()
@@ -217,5 +213,5 @@ class SynapseDownloader:
     async def _download_folder(self, syn_id, name, local_path):
         full_path = os.path.join(local_path, name)
         logging.info('Folder: {0} -> {1}'.format(syn_id, full_path))
-        self.ensure_dirs(full_path)
+        Utils.ensure_dirs(full_path)
         await self._download_children(syn_id, full_path)

@@ -3,6 +3,7 @@ import getpass
 import synapseclient as syn
 import logging
 from datetime import datetime
+from .utils import Utils
 
 
 class SynapseDownloaderOld:
@@ -18,7 +19,7 @@ class SynapseDownloaderOld:
         var_path = os.path.expandvars(download_path)
         expanded_path = os.path.expanduser(var_path)
         self._download_path = expanded_path
-        self.ensure_dirs(self._download_path)
+        Utils.ensure_dirs(self._download_path)
 
     def synapse_login(self):
         logging.info('Logging into Synapse...')
@@ -39,10 +40,6 @@ class SynapseDownloaderOld:
             logging.error('Synapse login failed: {0}'.format(str(ex)))
 
         return self._synapse_client is not None
-
-    def ensure_dirs(self, local_path):
-        if not os.path.isdir(local_path):
-            os.makedirs(local_path)
 
     def execute(self):
         self.start_time = datetime.now()
@@ -94,7 +91,7 @@ class SynapseDownloaderOld:
         try:
             full_path = os.path.join(local_path, name)
             logging.info('Folder: {0} -> {1}'.format(syn_id, full_path))
-            self.ensure_dirs(full_path)
+            Utils.ensure_dirs(full_path)
             self.download_children(syn_id, full_path)
         except Exception as ex:
             logging.exception(ex)
