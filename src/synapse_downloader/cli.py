@@ -14,7 +14,7 @@ def main(args=None):
     parser.add_argument('-p', '--password', help='Synapse password.', default=None)
     parser.add_argument('-l', '--log-level', help='Set the logging level.', default='INFO')
     parser.add_argument('-w', '--with-view',
-                        help='Use an entity view for loading file info. Fastest for large projects where you have write access to the project. Only available for "-s new"',
+                        help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new"',
                         default=False, action='store_true')
     parser.add_argument('-s', '--strategy', help='Use the new or old download strategy', default='new',
                         choices=['new', 'old', 'sync'])
@@ -42,17 +42,17 @@ def main(args=None):
                           args.download_path,
                           with_view=args.with_view,
                           username=args.username,
-                          password=args.password).execute()
+                          password=args.password).start()
     elif args.strategy == 'old':
         SynapseDownloaderOld(args.entity_id,
                              args.download_path,
                              username=args.username,
-                             password=args.password).execute()
+                             password=args.password).start()
     elif args.strategy == 'sync':
         SynapseDownloaderSync(args.entity_id,
                               args.download_path,
                               username=args.username,
-                              password=args.password).execute()
+                              password=args.password).start()
 
 
 if __name__ == "__main__":

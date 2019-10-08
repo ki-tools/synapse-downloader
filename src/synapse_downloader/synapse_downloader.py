@@ -4,8 +4,7 @@ import asyncio
 import aiohttp
 from datetime import datetime
 from .synapse_proxy import SynapseProxy
-from .syn_parent_iter import SynapseParentIter
-from .download_file_view import DownloadFileView
+from .download_view import DownloadView
 from .utils import Utils
 import synapseclient as syn
 
@@ -18,45 +17,31 @@ class SynapseDownloader:
         self._username = username
         self._password = password
 
-        self.project = None
-        self.download_view = None
+        self.start_time = None
+        self.end_time = None
+
+        self._download_view = None
         self._aiosession = None
 
         self.total_files = None
         self.files_processed = 0
         self.has_errors = False
 
-        self.start_time = None
-        self.end_time = None
-
         var_path = os.path.expandvars(download_path)
         expanded_path = os.path.expanduser(var_path)
         self._download_path = os.path.abspath(expanded_path)
-        Utils.ensure_dirs(self._download_path)
 
-    def execute(self):
+    def start(self):
         self.start_time = datetime.now()
 
         self.total_files = None
         self.files_processed = 0
         self.has_errors = False
 
-        SynapseProxy.login(username=self._username, password=self._password)
-
-        parent = SynapseProxy.get(self._starting_entity_id, downloadFile=False)
-        if type(parent) not in [syn.Project, syn.Folder]:
-            raise Exception('Starting entity must be a Project or Folder.')
-
-        logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
-        logging.info('Downloading to: {0}'.format(self._download_path))
-
-        if self._with_view:
-            self.project = SynapseParentIter(parent).project()
-            self.download_view = DownloadFileView(self.project, scope=parent).load()
-            self.total_files = len(self.download_view)
-            logging.info('Total files: {0}'.format(self.total_files))
-
-        asyncio.run(self._start(parent, self._download_path))
+        if SynapseProxy.login(username=self._username, password=self._password):
+            asyncio.run(self._startAsync())
+        else:
+            self.has_errors = True
 
         self.end_time = datetime.now()
         logging.info('')
@@ -67,10 +52,28 @@ class SynapseDownloader:
         else:
             logging.info('Finished successfully.')
 
-    async def _start(self, parent, local_path):
+    async def _startAsync(self):
         try:
+            Utils.ensure_dirs(self._download_path)
+
             self._aiosession = aiohttp.ClientSession()
-            await self._download_children(parent, local_path)
+
+            parent = await SynapseProxy.getAsync(self._starting_entity_id, downloadFile=False)
+
+            if type(parent) not in [syn.Project, syn.Folder]:
+                raise Exception('Starting entity must be a Project or Folder.')
+
+            logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
+            logging.info('Downloading to: {0}'.format(self._download_path))
+
+            self._download_view = DownloadView(parent, self._aiosession)
+
+            if self._with_view:
+                await self._download_view.load()
+                self.total_files = len(self._download_view)
+                logging.info('Total files: {0}'.format(self.total_files))
+
+            await self._download_children(parent, self._download_path)
         except Exception as ex:
             logging.exception(ex)
             self.has_errors = True
@@ -81,7 +84,7 @@ class SynapseDownloader:
         syn_folders = []
         syn_files = []
 
-        for child in await SynapseProxy.getChildrenAsync(parent, includeTypes=["folder", "file"]):
+        for child in await Utils.get_children(self._aiosession, parent, includeTypes=["folder", "file"]):
             child_id = child.get('id')
             child_name = child.get('name')
 
@@ -137,24 +140,18 @@ class SynapseDownloader:
             logging.exception(ex)
 
     async def _get_filehandles(self, file_ids):
-        uri = '/fileHandle/batch'
-        endpoint = SynapseProxy.client().fileHandleEndpoint
-        headers = None
-        uri, headers = SynapseProxy.client()._build_uri_and_headers(uri, endpoint, headers)
-
-        # Fix the signature for aiohttp
-        headers['signature'] = headers['signature'].decode("utf-8")
-
         results = []
+
+        total_ids = len(file_ids)
+        total_fetched = 0
+
+        Utils.print_inplace('Getting file handles...')
 
         for chunk in Utils.split_chunk(file_ids, 100):
             file_handle_associations = []
 
             for file_id in chunk:
-                if self.download_view:
-                    view_item = self.download_view[file_id]
-                else:
-                    view_item = await SynapseProxy.getAsync(file_id, downloadFile=False)
+                view_item = await self._download_view.get(file_id)
 
                 file_handle_associations.append({
                     'fileHandleId': view_item.get('dataFileHandleId'),
@@ -166,14 +163,23 @@ class SynapseDownloader:
                 'includeFileHandles': True,
                 'includePreSignedURLs': True,
                 'includePreviewPreSignedURLs': False,
-                'requestedFiles': file_handle_associations}
+                'requestedFiles': file_handle_associations
+            }
 
             try:
-                res = await Utils.rest_post(self._aiosession, uri, headers, body=body)
-                results += res.get('requestedFiles', [])
+                res = await Utils.rest_post(self._aiosession,
+                                            '/fileHandle/batch',
+                                            endpoint=SynapseProxy.client().fileHandleEndpoint,
+                                            body=body)
+                files = res.get('requestedFiles', [])
+                results += files
+
+                total_fetched += len(files)
+                Utils.print_inplace('Getting file handles: {0} of {1}'.format(total_fetched, total_ids))
             except Exception as ex:
                 logging.exception(ex)
                 self.has_errors = True
+        print('')
 
         return results
 

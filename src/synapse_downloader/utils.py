@@ -5,6 +5,10 @@ import asyncio
 import random
 import hashlib
 import aiofiles
+import json
+import synapseclient as syn
+import synapseclient.utils as syn_utils
+from .synapse_proxy import SynapseProxy
 
 
 class Utils:
@@ -39,12 +43,24 @@ class Utils:
             yield list[i:i + chunk_size]
 
     @staticmethod
-    async def rest_post(aiosession, url, headers=None, body=None):
+    def print_inplace(msg):
+        sys.stdout.write('\r')
+        sys.stdout.flush()
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+
+    @staticmethod
+    async def rest_post(aiosession, url, endpoint=None, headers=None, body=None):
         max_attempts = 5
         attempt_number = 0
         while True:
             try:
-                async with aiosession.post(url, headers=headers, json=body) as response:
+                uri, headers = SynapseProxy.client()._build_uri_and_headers(url, endpoint=endpoint, headers=headers)
+
+                if 'signature' in headers and isinstance(headers['signature'], bytes):
+                    headers['signature'] = headers['signature'].decode("utf-8")
+
+                async with aiosession.post(uri, headers=headers, json=body) as response:
                     return await response.json()
             except Exception as ex:
                 logging.exception(ex)
@@ -71,10 +87,7 @@ class Utils:
                             if not chunk:
                                 break
                             chunk_size_read += len(chunk)
-                            sys.stdout.write('\r')
-                            sys.stdout.flush()
-                            sys.stdout.write('  Saving chunk {0} of {1}'.format(chunk_size_read, total_size))
-                            sys.stdout.flush()
+                            Utils.print_inplace('  Saving chunk {0} of {1}'.format(chunk_size_read, total_size))
                             await fd.write(chunk)
                         print('')
                         logging.info('  Saved {0} bytes'.format(chunk_size_read))
@@ -89,6 +102,47 @@ class Utils:
                 else:
                     logging.error('  Failed to download file: {0}'.format(local_path))
                     raise
+
+    @staticmethod
+    async def get_children(aiosession,
+                           parent,
+                           includeTypes=["folder", "file", "table", "link", "entityview", "dockerrepo"],
+                           sortBy="NAME",
+                           sortDirection="ASC"):
+
+        parentId = syn_utils.id_of(parent) if parent is not None else None
+
+        request = {
+            'parentId': parentId,
+            'includeTypes': includeTypes,
+            'sortBy': sortBy,
+            'sortDirection': sortDirection,
+            'includeTotalChildCount': True,
+            'nextPageToken': None
+        }
+
+        results = []
+
+        Utils.print_inplace('Fetching children...')
+
+        total_fetched = 0
+
+        response = {"nextPageToken": "first"}
+        while response.get('nextPageToken') is not None:
+            response = await Utils.rest_post(aiosession, '/entity/children', body=request)
+
+            total_children = response['totalChildCount']
+            total_this_req = len(response['page'])
+            total_fetched += total_this_req
+
+            Utils.print_inplace('Fetching children: {0} of {1}'.format(total_fetched, total_children))
+
+            for child in response['page']:
+                results.append(child)
+            request['nextPageToken'] = response.get('nextPageToken', None)
+        print('')
+
+        return results
 
     @staticmethod
     async def get_md5(local_path):

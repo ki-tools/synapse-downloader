@@ -11,7 +11,6 @@ class SynapseProxy:
 
     @classmethod
     def login(cls, username=None, password=None):
-        logging.info('Logging into Synapse...')
         username = username or os.getenv('SYNAPSE_USERNAME')
         password = password or os.getenv('SYNAPSE_PASSWORD')
 
@@ -21,6 +20,7 @@ class SynapseProxy:
         if not password:
             password = getpass.getpass(prompt='Synapse password: ')
 
+        logging.info('Logging into Synapse as: {0}'.format(username))
         try:
             # Disable the synapseclient progress output.
             syn.utils.printTransferProgress = lambda *a, **k: None
@@ -40,12 +40,21 @@ class SynapseProxy:
         return cls._synapse_client
 
     @classmethod
+    def store(cls, obj, **kwargs):
+        return cls.client().store(obj, **kwargs)
+
+    @classmethod
+    async def storeAsync(cls, obj, **kwargs):
+        args = partial(cls.store, obj=obj, **kwargs)
+        return await asyncio.get_running_loop().run_in_executor(None, args)
+
+    @classmethod
     def get(cls, entity, **kwargs):
         return cls.client().get(entity, **kwargs)
 
     @classmethod
     async def getAsync(cls, entity, **kwargs):
-        args = partial(cls.client().get, entity=entity, **kwargs)
+        args = partial(cls.get, entity=entity, **kwargs)
         return await asyncio.get_running_loop().run_in_executor(None, args)
 
     @classmethod
@@ -54,5 +63,23 @@ class SynapseProxy:
 
     @classmethod
     async def getChildrenAsync(cls, parent, **kwargs):
-        args = partial(cls.client().getChildren, parent=parent, **kwargs)
+        args = partial(cls.getChildren, parent=parent, **kwargs)
+        return await asyncio.get_running_loop().run_in_executor(None, args)
+
+    @classmethod
+    def tableQuery(cls, query, resultsAs="csv", **kwargs):
+        return cls.client().tableQuery(query=query, resultsAs=resultsAs, **kwargs)
+
+    @classmethod
+    async def tableQueryAsync(cls, query, resultsAs="csv", **kwargs):
+        args = partial(cls.tableQuery, query=query, resultsAs=resultsAs, **kwargs)
+        return await asyncio.get_running_loop().run_in_executor(None, args)
+
+    @classmethod
+    def delete(cls, obj, version=None):
+        return cls.client().delete(obj, version=version)
+
+    @classmethod
+    async def deleteAsync(cls, obj, version=None):
+        args = partial(cls.delete, obj=obj, version=version)
         return await asyncio.get_running_loop().run_in_executor(None, args)

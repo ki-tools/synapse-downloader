@@ -1,14 +1,13 @@
 import os
-import getpass
 import synapseclient as syn
 import logging
 from datetime import datetime
 from .utils import Utils
+from .synapse_proxy import SynapseProxy
 
 
 class SynapseDownloaderOld:
     def __init__(self, starting_entity_id, download_path, username=None, password=None):
-        self._synapse_client = None
         self._starting_entity_id = starting_entity_id
         self._username = username
         self._password = password
@@ -19,33 +18,14 @@ class SynapseDownloaderOld:
         var_path = os.path.expandvars(download_path)
         expanded_path = os.path.expanduser(var_path)
         self._download_path = expanded_path
-        Utils.ensure_dirs(self._download_path)
 
-    def synapse_login(self):
-        logging.info('Logging into Synapse...')
-        self._username = self._username or os.getenv('SYNAPSE_USERNAME')
-        self._password = self._password or os.getenv('SYNAPSE_PASSWORD')
-
-        if not self._username:
-            self._username = input('Synapse username: ')
-
-        if not self._password:
-            self._password = getpass.getpass(prompt='Synapse password: ')
-
-        try:
-            self._synapse_client = syn.Synapse(skip_checks=True)
-            self._synapse_client.login(self._username, self._password, silent=True)
-        except Exception as ex:
-            self._synapse_client = None
-            logging.error('Synapse login failed: {0}'.format(str(ex)))
-
-        return self._synapse_client is not None
-
-    def execute(self):
+    def start(self):
         self.start_time = datetime.now()
 
-        self.synapse_login()
-        parent = self._synapse_client.get(self._starting_entity_id, downloadFile=False)
+        Utils.ensure_dirs(self._download_path)
+        
+        SynapseProxy.login(username=self._username, password=self._password)
+        parent = SynapseProxy.get(self._starting_entity_id, downloadFile=False)
         if type(parent) not in [syn.Project, syn.Folder]:
             raise Exception('Starting entity must be a Project or Folder.')
         logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
@@ -63,17 +43,15 @@ class SynapseDownloaderOld:
         syn_files = []
 
         try:
-            children = self._synapse_client.getChildren(parent, includeTypes=["folder", "file"])
+            children = SynapseProxy.getChildren(parent, includeTypes=["folder", "file"])
 
             for child in children:
                 child_id = child.get('id')
                 child_name = child.get('name')
 
                 if child.get('type') == 'org.sagebionetworks.repo.model.Folder':
-                    # self.download_folder(child_id, child_name, local_path)
                     syn_folders.append({'id': child_id, 'name': child_name, 'local_path': local_path})
                 else:
-                    # self.download_file(child_id, child_name, local_path)
                     syn_files.append({'id': child_id, 'name': child_name, 'local_path': local_path})
 
             if syn_files:
@@ -100,9 +78,9 @@ class SynapseDownloaderOld:
         try:
             full_path = os.path.join(local_path, name)
             logging.info('File  : {0} -> {1}'.format(syn_id, full_path))
-            self._synapse_client.get(syn_id,
-                                     downloadFile=True,
-                                     downloadLocation=local_path,
-                                     ifcollision='overwrite.local')
+            SynapseProxy.get(syn_id,
+                             downloadFile=True,
+                             downloadLocation=local_path,
+                             ifcollision='overwrite.local')
         except Exception as ex:
             logging.exception(ex)
