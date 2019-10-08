@@ -5,8 +5,6 @@ import asyncio
 import random
 import hashlib
 import aiofiles
-import json
-import synapseclient as syn
 import synapseclient.utils as syn_utils
 from .synapse_proxy import SynapseProxy
 
@@ -51,7 +49,7 @@ class Utils:
 
     @staticmethod
     async def rest_post(aiosession, url, endpoint=None, headers=None, body=None):
-        max_attempts = 5
+        max_attempts = 3
         attempt_number = 0
         while True:
             try:
@@ -75,7 +73,7 @@ class Utils:
 
     @staticmethod
     async def download_file(aiosession, url, local_path, total_size):
-        max_attempts = 5
+        max_attempts = 3
         attempt_number = 0
         while True:
             try:
@@ -91,6 +89,7 @@ class Utils:
                             await fd.write(chunk)
                         print('')
                         logging.info('  Saved {0} bytes'.format(chunk_size_read))
+                        assert chunk_size_read == total_size
                         break
             except Exception as ex:
                 logging.exception(ex)
@@ -143,6 +142,49 @@ class Utils:
         print('')
 
         return results
+
+    @staticmethod
+    async def get_file_handle_id(aiosession, syn_id):
+        request = {
+            'includeEntity': True,
+            'includeAnnotations': False,
+            'includePermissions': False,
+            'includeEntityPath': False,
+            'includeHasChildren': False,
+            'includeAccessControlList': False,
+            'includeFileHandles': False,
+            'includeTableBundle': False,
+            'includeRootWikiId': False,
+            'includeBenefactorACL': False,
+            'includeDOIAssociation': False,
+            'includeFileName': False,
+            'includeThreadCount': False,
+            'includeRestrictionInformation': False
+        }
+
+        res = await Utils.rest_post(aiosession, '/entity/{0}/bundle2'.format(syn_id), body=request)
+
+        return res.get('entity').get('dataFileHandleId')
+
+    @staticmethod
+    async def get_filehandle(aiosession, syn_id):
+        body = {
+            'includeFileHandles': True,
+            'includePreSignedURLs': True,
+            'includePreviewPreSignedURLs': False,
+            'requestedFiles': [{
+                'fileHandleId': await Utils.get_file_handle_id(aiosession, syn_id),
+                'associateObjectId': syn_id,
+                'associateObjectType': 'FileEntity'
+            }]
+        }
+
+        res = await Utils.rest_post(aiosession,
+                                    '/fileHandle/batch',
+                                    endpoint=SynapseProxy.client().fileHandleEndpoint,
+                                    body=body)
+        
+        return res.get('requestedFiles', [])[0]
 
     @staticmethod
     async def get_md5(local_path):

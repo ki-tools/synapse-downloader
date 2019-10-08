@@ -1,6 +1,7 @@
 from .synapse_downloader import SynapseDownloader
 from .synapse_downloader_old import SynapseDownloaderOld
 from .synapse_downloader_sync import SynapseDownloaderSync
+from .synapse_downloader_basic import SynapseDownloaderBasic
 import argparse
 import logging
 
@@ -16,8 +17,8 @@ def main(args=None):
     parser.add_argument('-w', '--with-view',
                         help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new"',
                         default=False, action='store_true')
-    parser.add_argument('-s', '--strategy', help='Use the new or old download strategy', default='new',
-                        choices=['new', 'old', 'sync'])
+    parser.add_argument('-s', '--strategy', help='Use the new or old download strategy', default='basic',
+                        choices=['new', 'old', 'sync', 'basic'])
 
     args = parser.parse_args(args)
 
@@ -53,6 +54,11 @@ def main(args=None):
                               args.download_path,
                               username=args.username,
                               password=args.password).start()
+    elif args.strategy == 'basic':
+        SynapseDownloaderBasic(args.entity_id,
+                               args.download_path,
+                               username=args.username,
+                               password=args.password).start()
 
 
 if __name__ == "__main__":
