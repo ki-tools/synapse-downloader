@@ -1,12 +1,8 @@
 import os
 import sys
-import logging
-import asyncio
-import random
 import hashlib
 import aiofiles
-import synapseclient.utils as syn_utils
-from .synapse_proxy import SynapseProxy
+import math
 
 
 class Utils:
@@ -43,148 +39,23 @@ class Utils:
     @staticmethod
     def print_inplace(msg):
         sys.stdout.write('\r')
+        sys.stdout.write('\033[K')
         sys.stdout.flush()
         sys.stdout.write(msg)
         sys.stdout.flush()
 
-    @staticmethod
-    async def rest_post(aiosession, url, endpoint=None, headers=None, body=None):
-        max_attempts = 3
-        attempt_number = 0
-        while True:
-            try:
-                uri, headers = SynapseProxy.client()._build_uri_and_headers(url, endpoint=endpoint, headers=headers)
-
-                if 'signature' in headers and isinstance(headers['signature'], bytes):
-                    headers['signature'] = headers['signature'].decode("utf-8")
-
-                async with aiosession.post(uri, headers=headers, json=body) as response:
-                    return await response.json()
-            except Exception as ex:
-                logging.exception(ex)
-                attempt_number += 1
-                if attempt_number < max_attempts:
-                    sleep_time = random.randint(1, 5)
-                    logging.info('  Retrying POST in: {0}'.format(sleep_time))
-                    await asyncio.sleep(sleep_time)
-                else:
-                    logging.error('  Failed POST: {0}'.format(url))
-                    raise
+    PRETTY_SIZE_NAMES = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
 
     @staticmethod
-    async def download_file(aiosession, url, local_path, total_size):
-        max_attempts = 3
-        attempt_number = 0
-        while True:
-            try:
-                async with aiosession.get(url) as response:
-                    async with aiofiles.open(local_path, mode='wb') as fd:
-                        chunk_size_read = 0
-                        while True:
-                            chunk = await response.content.read(Utils.CHUNK_SIZE)
-                            if not chunk:
-                                break
-                            chunk_size_read += len(chunk)
-                            Utils.print_inplace('  Saving chunk {0} of {1}'.format(chunk_size_read, total_size))
-                            await fd.write(chunk)
-                        print('')
-                        logging.info('  Saved {0} bytes'.format(chunk_size_read))
-                        assert chunk_size_read == total_size
-                        break
-            except Exception as ex:
-                logging.exception(ex)
-                attempt_number += 1
-                if attempt_number < max_attempts:
-                    sleep_time = random.randint(1, 5)
-                    logging.error('  Retrying file in: {0}'.format(sleep_time))
-                    await asyncio.sleep(sleep_time)
-                else:
-                    logging.error('  Failed to download file: {0}'.format(local_path))
-                    raise
-
-    @staticmethod
-    async def get_children(aiosession,
-                           parent,
-                           includeTypes=["folder", "file", "table", "link", "entityview", "dockerrepo"],
-                           sortBy="NAME",
-                           sortDirection="ASC"):
-
-        parentId = syn_utils.id_of(parent) if parent is not None else None
-
-        request = {
-            'parentId': parentId,
-            'includeTypes': includeTypes,
-            'sortBy': sortBy,
-            'sortDirection': sortDirection,
-            'includeTotalChildCount': True,
-            'nextPageToken': None
-        }
-
-        results = []
-
-        Utils.print_inplace('Fetching children...')
-
-        total_fetched = 0
-
-        response = {"nextPageToken": "first"}
-        while response.get('nextPageToken') is not None:
-            response = await Utils.rest_post(aiosession, '/entity/children', body=request)
-
-            total_children = response['totalChildCount']
-            total_this_req = len(response['page'])
-            total_fetched += total_this_req
-
-            Utils.print_inplace('Fetching children: {0} of {1}'.format(total_fetched, total_children))
-
-            for child in response['page']:
-                results.append(child)
-            request['nextPageToken'] = response.get('nextPageToken', None)
-        print('')
-
-        return results
-
-    # @staticmethod
-    # async def get_file_handle_id(aiosession, syn_id):
-    #     request = {
-    #         'includeEntity': True,
-    #         'includeAnnotations': False,
-    #         'includePermissions': False,
-    #         'includeEntityPath': False,
-    #         'includeHasChildren': False,
-    #         'includeAccessControlList': False,
-    #         'includeFileHandles': False,
-    #         'includeTableBundle': False,
-    #         'includeRootWikiId': False,
-    #         'includeBenefactorACL': False,
-    #         'includeDOIAssociation': False,
-    #         'includeFileName': False,
-    #         'includeThreadCount': False,
-    #         'includeRestrictionInformation': False
-    #     }
-    #
-    #     res = await Utils.rest_post(aiosession, '/entity/{0}/bundle2'.format(syn_id), body=request)
-    #
-    #     return res.get('entity').get('dataFileHandleId')
-
-    @staticmethod
-    async def get_filehandle(aiosession, syn_id, file_handle_id):
-        body = {
-            'includeFileHandles': True,
-            'includePreSignedURLs': True,
-            'includePreviewPreSignedURLs': False,
-            'requestedFiles': [{
-                'fileHandleId': file_handle_id,
-                'associateObjectId': syn_id,
-                'associateObjectType': 'FileEntity'
-            }]
-        }
-
-        res = await Utils.rest_post(aiosession,
-                                    '/fileHandle/batch',
-                                    endpoint=SynapseProxy.client().fileHandleEndpoint,
-                                    body=body)
-
-        return res.get('requestedFiles', [])[0]
+    def pretty_size(size):
+        if size > 0:
+            i = int(math.floor(math.log(size, 1024)))
+            p = math.pow(1024, i)
+            s = round(size / p, 2)
+        else:
+            i = 0
+            s = 0
+        return '{0} {1}'.format(s, Utils.PRETTY_SIZE_NAMES[i])
 
     @staticmethod
     async def get_md5(local_path):

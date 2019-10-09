@@ -2,8 +2,13 @@ import os
 import logging
 import getpass
 import asyncio
+import aiofiles
+import random
 import synapseclient as syn
+import synapseclient.utils as syn_utils
 from functools import partial
+from .utils import Utils
+from .aio_manager import AioManager
 
 
 class SynapseProxy:
@@ -83,3 +88,126 @@ class SynapseProxy:
     async def deleteAsync(cls, obj, version=None):
         args = partial(cls.delete, obj=obj, version=version)
         return await asyncio.get_running_loop().run_in_executor(None, args)
+
+    class Aio:
+        @classmethod
+        async def rest_post(cls, url, endpoint=None, headers=None, body=None):
+            max_attempts = 3
+            attempt_number = 0
+            while True:
+                try:
+                    uri, headers = SynapseProxy.client()._build_uri_and_headers(url, endpoint=endpoint, headers=headers)
+
+                    if 'signature' in headers and isinstance(headers['signature'], bytes):
+                        headers['signature'] = headers['signature'].decode("utf-8")
+
+                    async with AioManager.AIOSESSION.post(uri, headers=headers, json=body) as response:
+                        return await response.json()
+                except Exception as ex:
+                    logging.exception(ex)
+                    attempt_number += 1
+                    if attempt_number < max_attempts:
+                        sleep_time = random.randint(1, 5)
+                        logging.info('  Retrying POST in: {0}'.format(sleep_time))
+                        await asyncio.sleep(sleep_time)
+                    else:
+                        logging.error('  Failed POST: {0}'.format(url))
+                        raise
+
+        @classmethod
+        async def download_file(cls, url, local_path, total_size):
+            max_attempts = 3
+            attempt_number = 0
+            mb_total_size = Utils.pretty_size(total_size)
+            while True:
+                try:
+                    async with AioManager.AIOSESSION.get(url) as response:
+                        async with aiofiles.open(local_path, mode='wb') as fd:
+                            bytes_read = 0
+                            while True:
+                                chunk = await response.content.read(Utils.CHUNK_SIZE)
+                                if not chunk:
+                                    break
+                                bytes_read += len(chunk)
+                                Utils.print_inplace(
+                                    'Saving {0} of {1}'.format(Utils.pretty_size(bytes_read), mb_total_size))
+
+                                await fd.write(chunk)
+                            Utils.print_inplace('')
+                            logging.info('Saved {0}'.format(Utils.pretty_size(bytes_read)))
+                            assert bytes_read == total_size
+                            break
+                except Exception as ex:
+                    logging.exception(ex)
+                    attempt_number += 1
+                    if attempt_number < max_attempts:
+                        sleep_time = random.randint(1, 5)
+                        logging.error('  Retrying file in: {0}'.format(sleep_time))
+                        await asyncio.sleep(sleep_time)
+                    else:
+                        logging.error('  Failed to download file: {0}'.format(local_path))
+                        raise
+
+        @classmethod
+        async def get_children(cls,
+                               parent,
+                               includeTypes=["folder", "file", "table", "link", "entityview", "dockerrepo"],
+                               sortBy="NAME",
+                               sortDirection="ASC"):
+            request = {
+                'parentId': parent if isinstance(parent, str) else parent.id,
+                'includeTypes': includeTypes,
+                'sortBy': sortBy,
+                'sortDirection': sortDirection,
+                'includeTotalChildCount': True,
+                'nextPageToken': None
+            }
+
+            response = {"nextPageToken": "first"}
+            while response.get('nextPageToken') is not None:
+                response = await cls.rest_post('/entity/children', body=request)
+                for child in response['page']:
+                    yield child
+                request['nextPageToken'] = response.get('nextPageToken', None)
+
+        @classmethod
+        async def get_file_handle_id(cls, syn_id):
+            request = {
+                'includeEntity': True,
+                'includeAnnotations': False,
+                'includePermissions': False,
+                'includeEntityPath': False,
+                'includeHasChildren': False,
+                'includeAccessControlList': False,
+                'includeFileHandles': False,
+                'includeTableBundle': False,
+                'includeRootWikiId': False,
+                'includeBenefactorACL': False,
+                'includeDOIAssociation': False,
+                'includeFileName': False,
+                'includeThreadCount': False,
+                'includeRestrictionInformation': False
+            }
+
+            res = await cls.rest_post('/entity/{0}/bundle2'.format(syn_id), body=request)
+
+            return res.get('entity').get('dataFileHandleId')
+
+        @classmethod
+        async def get_filehandle(cls, syn_id, file_handle_id):
+            body = {
+                'includeFileHandles': True,
+                'includePreSignedURLs': True,
+                'includePreviewPreSignedURLs': False,
+                'requestedFiles': [{
+                    'fileHandleId': file_handle_id,
+                    'associateObjectId': syn_id,
+                    'associateObjectType': 'FileEntity'
+                }]
+            }
+
+            res = await cls.rest_post('/fileHandle/batch',
+                                      endpoint=SynapseProxy.client().fileHandleEndpoint,
+                                      body=body)
+
+            return res.get('requestedFiles', [])[0]

@@ -1,12 +1,11 @@
 import os
 import logging
-import asyncio
-import aiohttp
 from datetime import datetime
 from .synapse_proxy import SynapseProxy
 from .download_view import DownloadView
 from .utils import Utils
 import synapseclient as syn
+from .aio_manager import AioManager
 
 
 class SynapseDownloader:
@@ -21,7 +20,6 @@ class SynapseDownloader:
         self.end_time = None
 
         self._download_view = None
-        self._aiosession = None
 
         self.total_files = None
         self.files_processed = 0
@@ -32,14 +30,12 @@ class SynapseDownloader:
         self._download_path = os.path.abspath(expanded_path)
 
     def start(self):
-        self.start_time = datetime.now()
-
         self.total_files = None
         self.files_processed = 0
         self.has_errors = False
 
         if SynapseProxy.login(username=self._username, password=self._password):
-            asyncio.run(self._startAsync())
+            AioManager.start(self._startAsync)
         else:
             self.has_errors = True
 
@@ -56,8 +52,6 @@ class SynapseDownloader:
         try:
             Utils.ensure_dirs(self._download_path)
 
-            self._aiosession = aiohttp.ClientSession()
-
             parent = await SynapseProxy.getAsync(self._starting_entity_id, downloadFile=False)
 
             if type(parent) not in [syn.Project, syn.Folder]:
@@ -66,7 +60,7 @@ class SynapseDownloader:
             logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
             logging.info('Downloading to: {0}'.format(self._download_path))
 
-            self._download_view = DownloadView(parent, self._aiosession)
+            self._download_view = DownloadView(parent)
 
             if self._with_view:
                 await self._download_view.load()
@@ -78,14 +72,12 @@ class SynapseDownloader:
         except Exception as ex:
             logging.exception(ex)
             self.has_errors = True
-        finally:
-            await self._aiosession.close()
 
     async def _download_children(self, parent, local_path):
         syn_folders = []
         syn_files = []
 
-        for child in await Utils.get_children(self._aiosession, parent, includeTypes=["folder", "file"]):
+        for child in await SynapseProxy.Aio.get_children(parent, includeTypes=["folder", "file"]):
             child_id = child.get('id')
             child_name = child.get('name')
 
@@ -135,7 +127,7 @@ class SynapseDownloader:
                 logging.info('  Local file does not match remote file. Downloading...')
 
         try:
-            await Utils.download_file(self._aiosession, url, full_path, remote_size)
+            await SynapseProxy.Aio.download_file(url, full_path, remote_size)
         except Exception as ex:
             self.has_errors = True
             logging.exception(ex)
@@ -168,10 +160,9 @@ class SynapseDownloader:
             }
 
             try:
-                res = await Utils.rest_post(self._aiosession,
-                                            '/fileHandle/batch',
-                                            endpoint=SynapseProxy.client().fileHandleEndpoint,
-                                            body=body)
+                res = await SynapseProxy.Aio.rest_post('/fileHandle/batch',
+                                                       endpoint=SynapseProxy.client().fileHandleEndpoint,
+                                                       body=body)
                 files = res.get('requestedFiles', [])
                 results += files
 

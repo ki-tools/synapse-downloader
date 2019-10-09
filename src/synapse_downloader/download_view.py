@@ -1,23 +1,20 @@
 import uuid
 import logging
-from .synapse_proxy import SynapseProxy
 import synapseclient as syn
-from .utils import Utils
+from .synapse_proxy import SynapseProxy
 
 
 class DownloadView(dict):
-    VIEW_NAME = '_temp_{0}_synapse_downloader_'.format(str(uuid.uuid4()))
     COL_ID = 'id'
     COL_DATAFILEHANDLEID = 'dataFileHandleId'
 
-    def __init__(self, scope, aiosession):
+    def __init__(self, scope):
         """
 
         Args:
             scope: The Project or Folder to scope the view to.
         """
         self.scope = scope
-        self._aiosession = aiosession
         self.project = None
         self.view = None
 
@@ -43,30 +40,12 @@ class DownloadView(dict):
 
     async def get(self, syn_id):
         if syn_id not in self:
-            self._add_item(syn_id, await self._get_file_handle_id(syn_id))
+            self._add_item(syn_id, await SynapseProxy.Aio.get_file_handle_id(syn_id))
         return self[syn_id]
 
-    async def _get_file_handle_id(self, syn_id):
-        request = {
-            'includeEntity': True,
-            'includeAnnotations': False,
-            'includePermissions': False,
-            'includeEntityPath': False,
-            'includeHasChildren': False,
-            'includeAccessControlList': False,
-            'includeFileHandles': False,
-            'includeTableBundle': False,
-            'includeRootWikiId': False,
-            'includeBenefactorACL': False,
-            'includeDOIAssociation': False,
-            'includeFileName': False,
-            'includeThreadCount': False,
-            'includeRestrictionInformation': False
-        }
-
-        res = await Utils.rest_post(self._aiosession, '/entity/{0}/bundle2'.format(syn_id), body=request)
-
-        return res.get('entity').get('dataFileHandleId')
+    async def get_filehandle(self, syn_id):
+        view_item = await self.get(syn_id)
+        return await SynapseProxy.Aio.get_filehandle(syn_id, view_item.get(self.COL_DATAFILEHANDLEID))
 
     def _add_item(self, id, datafilehandleid):
         self[id] = {
@@ -91,7 +70,7 @@ class DownloadView(dict):
             syn.Column(name=self.COL_ID, columnType='ENTITYID'),
             syn.Column(name=self.COL_DATAFILEHANDLEID, columnType='FILEHANDLEID')
         ]
-        schema = syn.EntityViewSchema(name=self.VIEW_NAME,
+        schema = syn.EntityViewSchema(name=name,
                                       columns=cols,
                                       properties=None,
                                       parent=self.project,

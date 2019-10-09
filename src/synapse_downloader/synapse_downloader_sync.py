@@ -25,8 +25,6 @@ class SynapseDownloaderSync:
         self._download_path = expanded_path
 
     def start(self):
-        self.start_time = datetime.now()
-
         Utils.ensure_dirs(self._download_path)
 
         SynapseProxy.login(username=self._username, password=self._password)

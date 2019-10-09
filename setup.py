@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="synapse-downloader",
-    version="0.0.b22",
+    version="0.0.b23",
     author="Patrick Stout",
     author_email="pstout@prevagroup.com",
     license="Apache2",
@@ -17,8 +17,6 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src"),
     classifiers=(
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
