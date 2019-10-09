@@ -28,7 +28,7 @@ class SynapseDownloaderSync:
         self.start_time = datetime.now()
 
         Utils.ensure_dirs(self._download_path)
-        
+
         SynapseProxy.login(username=self._username, password=self._password)
         parent = SynapseProxy.get(self._starting_entity_id, downloadFile=False)
         if type(parent) not in [syn.Project, syn.Folder]:
@@ -37,6 +37,7 @@ class SynapseDownloaderSync:
         logging.info('Downloading to: {0}'.format(self._download_path))
         logging.info('')
 
+        self.start_time = datetime.now()
         synapseutils.sync.syncFromSynapse(syn=SynapseProxy.client(),
                                           entity=parent,
                                           path=self._download_path,

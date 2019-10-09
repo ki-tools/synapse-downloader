@@ -15,7 +15,7 @@ def main(args=None):
     parser.add_argument('-p', '--password', help='Synapse password.', default=None)
     parser.add_argument('-l', '--log-level', help='Set the logging level.', default='INFO')
     parser.add_argument('-w', '--with-view',
-                        help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new"',
+                        help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new or basic"',
                         default=False, action='store_true')
     parser.add_argument('-s', '--strategy', help='Use the new or old download strategy', default='basic',
                         choices=['new', 'old', 'sync', 'basic'])
@@ -57,6 +57,7 @@ def main(args=None):
     elif args.strategy == 'basic':
         SynapseDownloaderBasic(args.entity_id,
                                args.download_path,
+                               with_view=args.with_view,
                                username=args.username,
                                password=args.password).start()
 

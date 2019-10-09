@@ -73,6 +73,7 @@ class SynapseDownloader:
                 self.total_files = len(self._download_view)
                 logging.info('Total files: {0}'.format(self.total_files))
 
+            self.start_time = datetime.now()
             await self._download_children(parent, self._download_path)
         except Exception as ex:
             logging.exception(ex)

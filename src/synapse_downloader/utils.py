@@ -143,37 +143,37 @@ class Utils:
 
         return results
 
+    # @staticmethod
+    # async def get_file_handle_id(aiosession, syn_id):
+    #     request = {
+    #         'includeEntity': True,
+    #         'includeAnnotations': False,
+    #         'includePermissions': False,
+    #         'includeEntityPath': False,
+    #         'includeHasChildren': False,
+    #         'includeAccessControlList': False,
+    #         'includeFileHandles': False,
+    #         'includeTableBundle': False,
+    #         'includeRootWikiId': False,
+    #         'includeBenefactorACL': False,
+    #         'includeDOIAssociation': False,
+    #         'includeFileName': False,
+    #         'includeThreadCount': False,
+    #         'includeRestrictionInformation': False
+    #     }
+    #
+    #     res = await Utils.rest_post(aiosession, '/entity/{0}/bundle2'.format(syn_id), body=request)
+    #
+    #     return res.get('entity').get('dataFileHandleId')
+
     @staticmethod
-    async def get_file_handle_id(aiosession, syn_id):
-        request = {
-            'includeEntity': True,
-            'includeAnnotations': False,
-            'includePermissions': False,
-            'includeEntityPath': False,
-            'includeHasChildren': False,
-            'includeAccessControlList': False,
-            'includeFileHandles': False,
-            'includeTableBundle': False,
-            'includeRootWikiId': False,
-            'includeBenefactorACL': False,
-            'includeDOIAssociation': False,
-            'includeFileName': False,
-            'includeThreadCount': False,
-            'includeRestrictionInformation': False
-        }
-
-        res = await Utils.rest_post(aiosession, '/entity/{0}/bundle2'.format(syn_id), body=request)
-
-        return res.get('entity').get('dataFileHandleId')
-
-    @staticmethod
-    async def get_filehandle(aiosession, syn_id):
+    async def get_filehandle(aiosession, syn_id, file_handle_id):
         body = {
             'includeFileHandles': True,
             'includePreSignedURLs': True,
             'includePreviewPreSignedURLs': False,
             'requestedFiles': [{
-                'fileHandleId': await Utils.get_file_handle_id(aiosession, syn_id),
+                'fileHandleId': file_handle_id,
                 'associateObjectId': syn_id,
                 'associateObjectType': 'FileEntity'
             }]
@@ -183,7 +183,7 @@ class Utils:
                                     '/fileHandle/batch',
                                     endpoint=SynapseProxy.client().fileHandleEndpoint,
                                     body=body)
-        
+
         return res.get('requestedFiles', [])[0]
 
     @staticmethod

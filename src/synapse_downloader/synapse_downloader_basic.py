@@ -5,6 +5,7 @@ import aiohttp
 from datetime import datetime
 from .synapse_proxy import SynapseProxy
 from .utils import Utils
+from .download_view import DownloadView
 import synapseclient as syn
 
 
@@ -20,7 +21,7 @@ class SynapseDownloaderBasic:
         self.end_time = None
 
         self._aiosession = None
-
+        self._download_view = None
         self.files_processed = 0
         self.has_errors = False
 
@@ -59,9 +60,17 @@ class SynapseDownloaderBasic:
             if type(parent) not in [syn.Project, syn.Folder]:
                 raise Exception('Starting entity must be a Project or Folder.')
 
+            self._download_view = DownloadView(parent, self._aiosession)
+
+            if self._with_view:
+                await self._download_view.load()
+                self.total_files = len(self._download_view)
+                logging.info('Total files: {0}'.format(self.total_files))
+
             logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
             logging.info('Downloading to: {0}'.format(self._download_path))
 
+            self.start_time = datetime.now()
             await self._download_children(parent, self._download_path)
         except Exception as ex:
             logging.exception(ex)
@@ -100,7 +109,12 @@ class SynapseDownloaderBasic:
         self.files_processed += 1
 
         try:
-            filehandle = await Utils.get_filehandle(self._aiosession, syn_id)
+            view_item = await self._download_view.get(syn_id)
+
+            filehandle = await Utils.get_filehandle(self._aiosession,
+                                                    syn_id,
+                                                    view_item.get('dataFileHandleId'))
+
             url = filehandle.get('preSignedURL')
             filename = filehandle.get('fileHandle').get('fileName')
             remote_md5 = filehandle.get('fileHandle').get('contentMd5')
