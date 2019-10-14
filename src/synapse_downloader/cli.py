@@ -1,3 +1,4 @@
+import os
 import argparse
 import logging
 from .utils import Utils
@@ -26,6 +27,7 @@ def main(args=None):
 
     log_level = getattr(logging, args.log_level.upper())
     log_filename = Utils.expand_path(args.log_file)
+    Utils.ensure_dirs(os.path.dirname(log_filename))
 
     logging.basicConfig(
         filename=log_filename,
