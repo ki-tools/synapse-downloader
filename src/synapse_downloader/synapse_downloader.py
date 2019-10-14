@@ -12,6 +12,7 @@ class SynapseDownloader:
 
     def __init__(self, starting_entity_id, download_path, with_view=False, username=None, password=None):
         self._starting_entity_id = starting_entity_id
+        self._download_path = Utils.expand_path(download_path)
         self._with_view = with_view
         self._username = username
         self._password = password
@@ -24,10 +25,6 @@ class SynapseDownloader:
         self.total_files = None
         self.files_processed = 0
         self.has_errors = False
-
-        var_path = os.path.expandvars(download_path)
-        expanded_path = os.path.expanduser(var_path)
-        self._download_path = os.path.abspath(expanded_path)
 
     def start(self):
         self.total_files = None

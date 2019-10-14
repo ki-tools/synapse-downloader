@@ -1,9 +1,10 @@
+import argparse
+import logging
+from .utils import Utils
 from .synapse_downloader import SynapseDownloader
 from .synapse_downloader_old import SynapseDownloaderOld
 from .synapse_downloader_sync import SynapseDownloaderSync
 from .synapse_downloader_basic import SynapseDownloaderBasic
-import argparse
-import logging
 
 
 def main(args=None):
@@ -13,7 +14,8 @@ def main(args=None):
     parser.add_argument('download_path', metavar='download-path', help='The local path to save the files to.')
     parser.add_argument('-u', '--username', help='Synapse username.', default=None)
     parser.add_argument('-p', '--password', help='Synapse password.', default=None)
-    parser.add_argument('-l', '--log-level', help='Set the logging level.', default='INFO')
+    parser.add_argument('-ll', '--log-level', help='Set the logging level.', default='INFO')
+    parser.add_argument('-lf', '--log-file', help='Set path to a log file.', default='log.txt')
     parser.add_argument('-w', '--with-view',
                         help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new or basic"',
                         default=False, action='store_true')
@@ -23,7 +25,7 @@ def main(args=None):
     args = parser.parse_args(args)
 
     log_level = getattr(logging, args.log_level.upper())
-    log_filename = 'log.txt'
+    log_filename = Utils.expand_path(args.log_file)
 
     logging.basicConfig(
         filename=log_filename,
@@ -37,6 +39,8 @@ def main(args=None):
     console.setLevel(log_level)
     console.setFormatter(logging.Formatter('%(message)s'))
     logging.getLogger().addHandler(console)
+
+    print('Logging output to: {0}'.format(log_filename))
 
     if args.strategy == 'new':
         SynapseDownloader(args.entity_id,

@@ -1,5 +1,4 @@
 import os
-import sys
 import hashlib
 import aiofiles
 import math
@@ -8,6 +7,12 @@ import math
 class Utils:
     MB = 2 ** 20
     CHUNK_SIZE = 10 * MB
+
+    @staticmethod
+    def expand_path(local_path):
+        var_path = os.path.expandvars(local_path)
+        expanded_path = os.path.expanduser(var_path)
+        return os.path.abspath(expanded_path)
 
     @staticmethod
     def ensure_dirs(local_path):
