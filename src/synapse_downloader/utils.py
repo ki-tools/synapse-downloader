@@ -36,15 +36,18 @@ class Utils:
         for i in range(0, len(list), chunk_size):
             yield list[i:i + chunk_size]
 
+    # Holds the last string that was printed
+    __last_print_inplace_len = 0
+
     @staticmethod
     def print_inplace(msg):
-        sys.stdout.write('\r')
-        sys.stdout.write('\033[K')
-        sys.stdout.flush()
-        sys.stdout.write(msg)
-        sys.stdout.flush()
+        # Clear the line. Using this method so it works on Windows too.
+        print(' ' * Utils.__last_print_inplace_len, end='\r')
+        print(msg, end='\r')
+        Utils.__last_print_inplace_len = len(msg)
 
-    PRETTY_SIZE_NAMES = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    # Hold the names for pretty printing file sizes.
+    PRETTY_SIZE_NAMES = ("Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
 
     @staticmethod
     def pretty_size(size):
