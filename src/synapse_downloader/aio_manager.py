@@ -12,7 +12,7 @@ class AioManager:
     @classmethod
     async def _start_async(cls, func, **kwargs):
         try:
-            cls.AIOSESSION = aiohttp.ClientSession()
+            cls.AIOSESSION = aiohttp.ClientSession(raise_for_status=True)
             await func(**kwargs)
         finally:
             if cls.AIOSESSION:

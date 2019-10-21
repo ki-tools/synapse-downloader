@@ -40,7 +40,7 @@ class SynapseDownloaderBasic:
 
         self.end_time = datetime.now()
         logging.info('')
-        logging.info('Run time: {0}'.format(self.end_time - self.start_time))
+        logging.info('Run time: {0}'.format(self.end_time - (self.start_time or datetime.now())))
 
         if self.has_errors:
             logging.error('Finished with errors. Please see log file.')
@@ -125,5 +125,5 @@ class SynapseDownloaderBasic:
         except Exception as ex:
             self.has_errors = True
             logging.exception(ex)
-            
+
         self.files_processed += 1

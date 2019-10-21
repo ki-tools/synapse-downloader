@@ -94,19 +94,26 @@ class SynapseProxy:
         async def rest_post(cls, url, endpoint=None, headers=None, body=None):
             max_attempts = 3
             attempt_number = 0
+
             while True:
+                can_retry = True
                 try:
                     uri, headers = SynapseProxy.client()._build_uri_and_headers(url, endpoint=endpoint, headers=headers)
 
                     if 'signature' in headers and isinstance(headers['signature'], bytes):
                         headers['signature'] = headers['signature'].decode("utf-8")
 
-                    async with AioManager.AIOSESSION.post(uri, headers=headers, json=body) as response:
+                    async with AioManager.AIOSESSION.post(uri,
+                                                          headers=headers,
+                                                          json=body,
+                                                          raise_for_status=False) as response:
+                        can_retry = (response.status < 400)
+                        response.raise_for_status()
                         return await response.json()
                 except Exception as ex:
                     logging.exception(ex)
                     attempt_number += 1
-                    if attempt_number < max_attempts:
+                    if attempt_number < max_attempts and can_retry:
                         sleep_time = random.randint(1, 5)
                         logging.info('  Retrying POST in: {0}'.format(sleep_time))
                         await asyncio.sleep(sleep_time)
@@ -119,9 +126,14 @@ class SynapseProxy:
             max_attempts = 3
             attempt_number = 0
             mb_total_size = Utils.pretty_size(total_size)
+
             while True:
+                can_retry = True
                 try:
-                    async with AioManager.AIOSESSION.get(url) as response:
+                    async with AioManager.AIOSESSION.get(url, raise_for_status=False) as response:
+                        can_retry = (response.status < 400)
+                        response.raise_for_status()
+
                         async with aiofiles.open(local_path, mode='wb') as fd:
                             bytes_read = 0
                             while True:
@@ -140,7 +152,7 @@ class SynapseProxy:
                 except Exception as ex:
                     logging.exception(ex)
                     attempt_number += 1
-                    if attempt_number < max_attempts:
+                    if attempt_number < max_attempts and can_retry:
                         sleep_time = random.randint(1, 5)
                         logging.error('  Retrying file in: {0}'.format(sleep_time))
                         await asyncio.sleep(sleep_time)
