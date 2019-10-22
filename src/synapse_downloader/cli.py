@@ -2,6 +2,7 @@ import os
 import argparse
 import logging
 from .utils import Utils
+from .synapse_proxy import SynapseProxy
 from .synapse_downloader import SynapseDownloader
 from .synapse_downloader_old import SynapseDownloaderOld
 from .synapse_downloader_sync import SynapseDownloaderSync
@@ -17,6 +18,10 @@ def main(args=None):
     parser.add_argument('-p', '--password', help='Synapse password.', default=None)
     parser.add_argument('-ll', '--log-level', help='Set the logging level.', default='INFO')
     parser.add_argument('-lf', '--log-file', help='Set path to a log file.', default='log.txt')
+    parser.add_argument('-dt', '--download-timeout',
+                        help='Set the maximum time (in seconds) a file can download before it is canceled.',
+                        type=int,
+                        default=SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT)
     parser.add_argument('-w', '--with-view',
                         help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new or basic"',
                         default=False, action='store_true')
@@ -43,6 +48,10 @@ def main(args=None):
     logging.getLogger().addHandler(console)
 
     print('Logging output to: {0}'.format(log_filename))
+
+    if args.download_timeout != SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT:
+        SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT = args.download_timeout
+        logging.info('Download timeout set to: {0}'.format(SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT))
 
     if args.strategy == 'new':
         SynapseDownloader(args.entity_id,

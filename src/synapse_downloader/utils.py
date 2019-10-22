@@ -5,7 +5,8 @@ import math
 
 
 class Utils:
-    MB = 2 ** 20
+    KB = 1024
+    MB = KB * KB
     CHUNK_SIZE = 10 * MB
 
     @staticmethod

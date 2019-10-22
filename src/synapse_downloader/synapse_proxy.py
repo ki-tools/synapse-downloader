@@ -2,6 +2,7 @@ import os
 import logging
 import getpass
 import asyncio
+import aiohttp
 import aiofiles
 import random
 import synapseclient as syn
@@ -90,30 +91,27 @@ class SynapseProxy:
         return await asyncio.get_running_loop().run_in_executor(None, args)
 
     class Aio:
+        # File downloads have a max of 1 hour to download.
+        FILE_DOWNLOAD_TIMEOUT = 60 * 60
+
         @classmethod
         async def rest_post(cls, url, endpoint=None, headers=None, body=None):
             max_attempts = 3
             attempt_number = 0
 
             while True:
-                can_retry = True
                 try:
                     uri, headers = SynapseProxy.client()._build_uri_and_headers(url, endpoint=endpoint, headers=headers)
 
                     if 'signature' in headers and isinstance(headers['signature'], bytes):
                         headers['signature'] = headers['signature'].decode("utf-8")
 
-                    async with AioManager.AIOSESSION.post(uri,
-                                                          headers=headers,
-                                                          json=body,
-                                                          raise_for_status=False) as response:
-                        can_retry = (response.status < 400)
-                        response.raise_for_status()
+                    async with AioManager.AIOSESSION.post(uri, headers=headers, json=body) as response:
                         return await response.json()
                 except Exception as ex:
                     logging.exception(ex)
                     attempt_number += 1
-                    if attempt_number < max_attempts and can_retry:
+                    if attempt_number < max_attempts:
                         sleep_time = random.randint(1, 5)
                         logging.info('  Retrying POST in: {0}'.format(sleep_time))
                         await asyncio.sleep(sleep_time)
@@ -123,17 +121,16 @@ class SynapseProxy:
 
         @classmethod
         async def download_file(cls, url, local_path, total_size):
+            # TODO: Add resume ability for downloads.
             max_attempts = 3
             attempt_number = 0
             mb_total_size = Utils.pretty_size(total_size)
 
             while True:
-                can_retry = True
                 try:
-                    async with AioManager.AIOSESSION.get(url, raise_for_status=False) as response:
-                        can_retry = (response.status < 400)
-                        response.raise_for_status()
+                    timeout = aiohttp.ClientTimeout(total=cls.FILE_DOWNLOAD_TIMEOUT)
 
+                    async with AioManager.AIOSESSION.get(url, timeout=timeout) as response:
                         async with aiofiles.open(local_path, mode='wb') as fd:
                             bytes_read = 0
                             while True:
@@ -152,7 +149,7 @@ class SynapseProxy:
                 except Exception as ex:
                     logging.exception(ex)
                     attempt_number += 1
-                    if attempt_number < max_attempts and can_retry:
+                    if attempt_number < max_attempts:
                         sleep_time = random.randint(1, 5)
                         logging.error('  Retrying file in: {0}'.format(sleep_time))
                         await asyncio.sleep(sleep_time)
