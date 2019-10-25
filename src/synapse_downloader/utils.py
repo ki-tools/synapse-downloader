@@ -29,6 +29,31 @@ class Utils:
             os.makedirs(local_path)
 
     @staticmethod
+    def get_dirs_and_files(local_path):
+        """Gets all the directories and files in a local path.
+
+        Args:
+            local_path: The path to get files and folders for.
+
+        Returns:
+            List of directory path, List of file paths.
+        """
+        dirs = []
+        files = []
+
+        entries = list(os.scandir(local_path))
+        for entry in entries:
+            if entry.is_dir(follow_symlinks=False):
+                dirs.append(entry)
+            else:
+                files.append(entry)
+
+        dirs.sort(key=lambda f: f.name)
+        files.sort(key=lambda f: f.name)
+
+        return dirs, files
+
+    @staticmethod
     def split_chunk(list, chunk_size):
         """Yield successive n-sized chunks from a list.
 

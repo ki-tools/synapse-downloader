@@ -3,4 +3,4 @@ from src.synapse_downloader.cli import main
 
 
 def test_cli():
-    main(['syn18406882', '/tmp/syn-download', '-s', 'basic'])
+    main(['syn21003004', '/tmp/syn-download', '-c'])

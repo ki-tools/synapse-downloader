@@ -4,7 +4,7 @@ import synapseclient as syn
 from .synapse_proxy import SynapseProxy
 
 
-class DownloadView(dict):
+class FileHandleView(dict):
     COL_ID = 'id'
     COL_DATAFILEHANDLEID = 'dataFileHandleId'
 

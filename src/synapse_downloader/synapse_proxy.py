@@ -163,8 +163,18 @@ class SynapseProxy:
                                includeTypes=["folder", "file", "table", "link", "entityview", "dockerrepo"],
                                sortBy="NAME",
                                sortDirection="ASC"):
+            parent_id = parent
+            if isinstance(parent, str):
+                parent_id = parent
+            elif isinstance(parent, syn.Entity):
+                parent_id = parent.id
+            elif isinstance(parent, dict):
+                parent_id = parent['id']
+            else:
+                raise Exception('Invalid parent object: {0}'.format(parent))
+
             request = {
-                'parentId': parent if isinstance(parent, str) else parent.id,
+                'parentId': parent_id,
                 'includeTypes': includeTypes,
                 'sortBy': sortBy,
                 'sortDirection': sortDirection,

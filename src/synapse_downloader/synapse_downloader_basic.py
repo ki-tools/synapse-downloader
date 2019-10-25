@@ -5,13 +5,14 @@ import synapseclient as syn
 from .aio_manager import AioManager
 from .utils import Utils
 from .synapse_proxy import SynapseProxy
-from .download_view import DownloadView
+from .file_handle_view import FileHandleView
 
 
 class SynapseDownloaderBasic:
 
     def __init__(self, starting_entity_id, download_path, with_view=False, username=None, password=None):
         self._starting_entity_id = starting_entity_id
+        self._download_path = Utils.expand_path(download_path)
         self._with_view = with_view
         self._username = username
         self._password = password
@@ -19,14 +20,10 @@ class SynapseDownloaderBasic:
         self.start_time = None
         self.end_time = None
 
-        self._download_view = None
+        self._file_handle_view = None
         self.total_files = None
         self.files_processed = 0
         self.has_errors = False
-
-        var_path = os.path.expandvars(download_path)
-        expanded_path = os.path.expanduser(var_path)
-        self._download_path = os.path.abspath(expanded_path)
 
     def start(self):
         self.total_files = None
@@ -56,15 +53,15 @@ class SynapseDownloaderBasic:
             if type(parent) not in [syn.Project, syn.Folder]:
                 raise Exception('Starting entity must be a Project or Folder.')
 
-            self._download_view = DownloadView(parent)
-
-            if self._with_view:
-                await self._download_view.load()
-                self.total_files = len(self._download_view)
-                logging.info('Total files: {0}'.format(self.total_files))
-
             logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
             logging.info('Downloading to: {0}'.format(self._download_path))
+
+            self._file_handle_view = FileHandleView(parent)
+
+            if self._with_view:
+                await self._file_handle_view.load()
+                self.total_files = len(self._file_handle_view)
+                logging.info('Total files: {0}'.format(self.total_files))
 
             self.start_time = datetime.now()
             await self._download_children(parent, self._download_path)
@@ -96,7 +93,7 @@ class SynapseDownloaderBasic:
 
     async def _download_file(self, syn_id, local_path):
         try:
-            filehandle = await self._download_view.get_filehandle(syn_id)
+            filehandle = await self._file_handle_view.get_filehandle(syn_id)
 
             url = filehandle.get('preSignedURL')
             filename = filehandle.get('fileHandle').get('fileName')
@@ -114,7 +111,9 @@ class SynapseDownloaderBasic:
 
             can_download = True
 
-            if os.path.isfile(full_path):
+            # Only check the md5 if the file sizes match.
+            # This way we can avoid MD5 checking for partial downloads and changed files.
+            if os.path.isfile(full_path) and os.path.getsize(full_path) == content_size:
                 local_md5 = await Utils.get_md5(full_path)
                 if local_md5 == remote_md5:
                     can_download = False

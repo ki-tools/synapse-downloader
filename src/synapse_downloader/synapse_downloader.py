@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime
 from .synapse_proxy import SynapseProxy
-from .download_view import DownloadView
+from .file_handle_view import FileHandleView
 from .utils import Utils
 import synapseclient as syn
 from .aio_manager import AioManager
@@ -20,7 +20,7 @@ class SynapseDownloader:
         self.start_time = None
         self.end_time = None
 
-        self._download_view = None
+        self._file_handle_view = None
 
         self.total_files = None
         self.files_processed = 0
@@ -57,11 +57,11 @@ class SynapseDownloader:
             logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
             logging.info('Downloading to: {0}'.format(self._download_path))
 
-            self._download_view = DownloadView(parent)
+            self._file_handle_view = FileHandleView(parent)
 
             if self._with_view:
-                await self._download_view.load()
-                self.total_files = len(self._download_view)
+                await self._file_handle_view.load()
+                self.total_files = len(self._file_handle_view)
                 logging.info('Total files: {0}'.format(self.total_files))
 
             self.start_time = datetime.now()
@@ -141,7 +141,7 @@ class SynapseDownloader:
             file_handle_associations = []
 
             for file_id in chunk:
-                view_item = await self._download_view.get(file_id)
+                view_item = await self._file_handle_view.get(file_id)
 
                 file_handle_associations.append({
                     'fileHandleId': view_item.get('dataFileHandleId'),
