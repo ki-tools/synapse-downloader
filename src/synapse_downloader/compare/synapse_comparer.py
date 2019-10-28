@@ -9,9 +9,9 @@ from ..file_handle_view import FileHandleView
 
 
 class SynapseComparer:
-    def __init__(self, remote_id, local_path, with_view=False, username=None, password=None):
+    def __init__(self, starting_entity_id, local_path, with_view=False, username=None, password=None):
+        self._starting_entity_id = starting_entity_id
         self._local_path = Utils.expand_path(local_path)
-        self._remote_id = remote_id
         self._with_view = with_view
         self._username = username
         self._password = password
@@ -20,13 +20,14 @@ class SynapseComparer:
 
         self.start_time = None
         self.end_time = None
-        self.total_files = None
+        self.total_remote_files = None
+        self.remote_files_processed = 0
         self.has_errors = False
-        self.files_processed = 0
 
     def start(self):
+        self.total_remote_files = None
+        self.remote_files_processed = 0
         self.has_errors = False
-        self.files_processed = 0
 
         if SynapseProxy.login(username=self._username, password=self._password):
             AioManager.start(self._startAsync)
@@ -38,106 +39,145 @@ class SynapseComparer:
         logging.info('Run time: {0}'.format(self.end_time - (self.start_time or datetime.now())))
 
         if self.has_errors:
-            logging.error('Finished with errors. Please see log file.')
+            logging.error('Finished with errors. See log file.')
         else:
             logging.info('Finished successfully.')
 
     async def _startAsync(self):
         try:
-            parent = await SynapseProxy.getAsync(self._remote_id, downloadFile=False)
+            start_entity = await SynapseProxy.getAsync(self._starting_entity_id, downloadFile=False)
 
-            if type(parent) not in [syn.Project, syn.Folder]:
-                raise Exception('Remote entity must be a Project or Folder.')
+            if type(start_entity) not in [syn.Project, syn.Folder, syn.File]:
+                raise Exception('Starting entity must be a Project, Folder, or File.')
 
-            logging.info('Remote Entity: {0} ({1})'.format(parent.name, parent.id))
+            logging.info('Starting entity: {0} ({1})'.format(start_entity.name, start_entity.id))
             logging.info('Local Path: {0}'.format(self._local_path))
 
-            self._file_handle_view = FileHandleView(parent)
+            self._file_handle_view = FileHandleView(start_entity)
 
             if self._with_view:
                 await self._file_handle_view.load()
-                self.total_files = len(self._file_handle_view)
-                logging.info('Total files: {0}'.format(self.total_files))
+                self.total_remote_files = len(self._file_handle_view)
+                logging.info('Total Remote files: {0}'.format(self.total_remote_files))
 
             self.start_time = datetime.now()
-            await self._check_path(parent, self._local_path)
+
+            if isinstance(start_entity, syn.File):
+                parent = await SynapseProxy.getAsync(start_entity.parentId)
+                await self._check_path(parent, self._local_path, remote_file=start_entity)
+            else:
+                await self._check_path(start_entity, self._local_path)
         except Exception as ex:
             logging.exception(ex)
-            self.has_errors = True
+            self._log_error('Unknown error. See log file.')
 
-    def _add_error(self, msg):
+    def _log_error(self, *msg):
         self.has_errors = True
-        logging.error(msg)
+        logging.error(os.linesep.join(msg))
 
-    async def _check_path(self, parent, local_path):
-        local_dirs, local_files = Utils.get_dirs_and_files(local_path) if os.path.isdir(local_path) else [[], []]
-        remote_dirs, remote_files = await self._get_remote_dirs_and_files(parent)
+    def _log_info(self, *msg):
+        logging.info(os.linesep.join(msg))
 
-        for remote_dir in remote_dirs:
-            local_match = self._find_by_name(local_dirs, remote_dir['name'])
-            if not local_match:
-                err_strs = ['[LOCAL DIRECTORY NOT FOUND]']
-                err_strs.append('  REMOTE [+]: {0}({1})'.format(remote_dir['name'], remote_dir['id']))
-                err_strs.append('  LOCAL  [ ]: {0}'.format(os.path.join(local_path, remote_dir['name'])))
-                self._add_error(os.linesep.join(err_strs))
+    async def _check_path(self, parent, local_path, remote_file=None):
+        if os.path.isdir(local_path):
+            remote_file_filename = remote_file.get('_file_handle').get('fileName') if remote_file else None
 
-        for local_dir in local_dirs:
-            remote_match = self._find_by_name(remote_dirs, local_dir.name)
-            if not remote_match:
-                err_strs = ['[REMOTE DIRECTORY NOT FOUND]']
-                err_strs.append('  LOCAL  [+]: {0}'.format(local_dir.path))
-                err_strs.append('  REMOTE [ ]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_dir.name))
-                self._add_error(os.linesep.join(err_strs))
+            local_dirs, local_files = self._get_local_dirs_and_files(local_path, filename=remote_file_filename)
+        else:
+            local_dirs, local_files = [[], []]
+
+        remote_dirs, remote_files = await self._get_remote_dirs_and_files(parent, remote_file=remote_file)
 
         for remote_file in remote_files:
+            self.remote_files_processed += 1
+            progress_msg = str(self.remote_files_processed)
+            if self.total_remote_files is not None:
+                progress_msg += ' of {0}'.format(self.total_remote_files)
+
             local_match = self._find_by_name(local_files, remote_file['name'])
             if local_match:
+                local_files.remove(local_match)
+                self._log_info('[LOCAL FILE FOUND] [{0}]'.format(progress_msg),
+                               '  REMOTE [+]: {0}({1})'.format(remote_file['name'], remote_file['id']),
+                               '  LOCAL  [+]: {0}'.format(local_match.path))
+
                 remote_size = remote_file['content_size']
                 local_size = os.path.getsize(local_match.path)
                 if local_size != remote_size:
-                    err_strs = ['[SIZE MISMATCH]']
-                    err_strs.append('  REMOTE [{0}]: {1}({2})'.format(remote_size,
-                                                                      remote_file['name'],
-                                                                      remote_file['id']))
-                    err_strs.append('  LOCAL  [{0}]: {1}'.format(local_size, local_match.path))
-                    self._add_error(os.linesep.join(err_strs))
+                    self._log_error('[SIZE MISMATCH]',
+                                    '  REMOTE [-]: {0}({1}) ({2})'.format(remote_file['name'],
+                                                                          remote_file['id'],
+                                                                          Utils.pretty_size(remote_size)),
+                                    '  LOCAL  [-]: {0} ({1})'.format(local_match.path, Utils.pretty_size(local_size)))
                 else:
                     remote_md5 = remote_file['content_md5']
                     local_md5 = await Utils.get_md5(local_match.path)
                     if local_md5 != remote_md5:
-                        err_strs = ['[MD5 MISMATCH]']
-                        err_strs.append('  REMOTE [{0}]: {1}({2})'.format(remote_md5,
+                        self._log_error('[MD5 MISMATCH]',
+                                        '  REMOTE [{0}]: {1}({2})'.format(remote_md5,
                                                                           remote_file['name'],
-                                                                          remote_file['id']))
-                        err_strs.append('  LOCAL  [{0}]: {1}'.format(local_md5, local_match.path))
-                        self._add_error(os.linesep.join(err_strs))
+                                                                          remote_file['id']),
+                                        '  LOCAL  [{0}]: {1}'.format(local_md5, local_match.path))
+
             else:
-                err_strs = ['[LOCAL FILE NOT FOUND]']
-                err_strs.append('  REMOTE [+]: {0}({1})'.format(remote_file['name'], remote_file['id']))
-                err_strs.append('  LOCAL  [ ]: {0}'.format(os.path.join(local_path, remote_file['name'])))
-                self._add_error(os.linesep.join(err_strs))
+                self._log_error('[LOCAL FILE NOT FOUND] [{0}]'.format(progress_msg),
+                                '  REMOTE [+]: {0}({1})'.format(remote_file['name'], remote_file['id']),
+                                '  LOCAL  [-]: {0}'.format(os.path.join(local_path, remote_file['name'])))
+
+        for remote_dir in remote_dirs:
+            local_match = self._find_by_name(local_dirs, remote_dir['name'])
+            if local_match:
+                local_dirs.remove(local_match)
+                self._log_info('[LOCAL DIRECTORY FOUND]',
+                               '  REMOTE [+]: {0}({1})'.format(remote_dir['name'], remote_dir['id']),
+                               '  LOCAL  [+]: {0}'.format(local_match.path))
+
+                await self._check_path(remote_dir, os.path.join(local_path, remote_dir['name']))
+            else:
+                self._log_error('[LOCAL DIRECTORY NOT FOUND]',
+                                '  REMOTE [+]: {0}({1})'.format(remote_dir['name'], remote_dir['id']),
+                                '  LOCAL  [-]: {0}'.format(os.path.join(local_path, remote_dir['name'])))
 
         for local_file in local_files:
             remote_match = self._find_by_name(remote_files, local_file.name)
-            if not remote_match:
-                err_strs = ['[REMOTE FILE NOT FOUND]']
-                err_strs.append('  LOCAL  [+]: {0}'.format(local_file.path))
-                err_strs.append('  REMOTE [ ]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_file.name))
-                self._add_error(os.linesep.join(err_strs))
+            if remote_match:
+                remote_files.remove(remote_match)
+                self._log_info('[REMOTE FILE FOUND]',
+                               '  LOCAL  [+]: {0}'.format(local_file.path),
+                               '  REMOTE [+]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_file.name))
+            else:
+                self._log_error('[REMOTE FILE NOT FOUND]',
+                                '  LOCAL  [+]: {0}'.format(local_file.path),
+                                '  REMOTE [-]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_file.name))
 
-            self.files_processed += 1
-            if self.files_processed % 100 == 0:
-                progress_msg = str(self.files_processed)
-                if self.total_files is not None:
-                    progress_msg += ' of {0}'.format(self.total_files)
-                logging.info('Processed Files: {0}'.format(progress_msg))
+        for local_dir in local_dirs:
+            remote_match = self._find_by_name(remote_dirs, local_dir.name)
+            if remote_match:
+                remote_dirs.remove(remote_match)
+                self._log_info('[REMOTE DIRECTORY FOUND]',
+                               '  LOCAL  [+]: {0}'.format(local_dir.path),
+                               '  REMOTE [+]: {0}/{1}({2})'.format(parent['name'], remote_match['name'],
+                                                                   remote_match['id']))
 
-        # Check the child folders.
-        for remote_dir in remote_dirs:
-            await self._check_path(remote_dir, os.path.join(local_path, remote_dir['name']))
+                await self._check_path(remote_match, os.path.join(local_path, remote_match['name']))
+            else:
+                self._log_error('[REMOTE DIRECTORY NOT FOUND]',
+                                '  LOCAL  [+]: {0}'.format(local_dir.path),
+                                '  REMOTE [-]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_dir.name))
 
     def _find_by_name(self, _list, name):
-        results = []
+        """Finds an item by its name property in a list.
+
+        Args:
+            _list: The list (dicts, syn.Files, or syn.Folders) to search.
+            name: The name to search by.
+
+        Returns:
+            The matching list item or None.
+
+        Raises:
+            Exception if more than one item in the list matches the name.
+        """
 
         if len(_list) and isinstance(_list[-1], dict):
             results = [item for item in _list if item['name'] == name]
@@ -151,23 +191,73 @@ class SynapseComparer:
         else:
             return None
 
-    async def _get_remote_dirs_and_files(self, parent):
+    def _get_local_dirs_and_files(self, local_path, filename=None):
+        """Gets all the directories and files in a local path, or a specific file by its name.
+
+        Args:
+            local_path: The local path to get files and folders for.
+            filename: The name of a single file to return in local_path (if it exists). If present then only
+                      this file will be returned in the files list.
+
+        Returns:
+            List of directory paths, List of file paths.
+        """
+        dirs = []
+        files = []
+
+        entries = list(os.scandir(local_path))
+        for entry in entries:
+            # Do not follow any sym links.
+            if entry.is_symlink():
+                continue
+
+            if filename:
+                if entry.is_file() and entry.name == filename:
+                    files.append(entry)
+                    break
+            else:
+                if entry.is_dir():
+                    dirs.append(entry)
+                else:
+                    files.append(entry)
+
+        dirs.sort(key=lambda f: f.name)
+        files.sort(key=lambda f: f.name)
+
+        return dirs, files
+
+    async def _get_remote_dirs_and_files(self, parent, remote_file=None):
+        """Gets all the directories and files in a remote parent (Project or Folder), or a specific remote file.
+
+        Args:
+            parent: The remote project or folder to get directories and files for.
+            remote_file: The only remote File to return. If present then only this file is returned in the files list.
+
+        Returns:
+            List of dicts with folder attributes, List of dicts with file attributes.
+        """
         remote_dirs = []
         remote_files = []
 
-        async for child in SynapseProxy.Aio.get_children(parent, includeTypes=["folder", "file"]):
+        async def _add_child(id, name, is_file=False):
             entity = {
-                'id': child.get('id'),
-                'name': child.get('name')
+                'id': id,
+                'name': name
             }
-
-            if child.get('type') == 'org.sagebionetworks.repo.model.Folder':
-                remote_dirs.append(entity)
-            else:
-                filehandle = await self._file_handle_view.get_filehandle(child.get('id'))
+            if is_file:
+                filehandle = await self._file_handle_view.get_filehandle(id)
                 entity['name'] = filehandle.get('fileHandle').get('fileName')
                 entity['content_md5'] = filehandle.get('fileHandle').get('contentMd5')
                 entity['content_size'] = filehandle.get('fileHandle').get('contentSize')
                 remote_files.append(entity)
+            else:
+                remote_dirs.append(entity)
+
+        if remote_file:
+            await _add_child(remote_file.id, remote_file.name, is_file=True)
+        else:
+            async for child in SynapseProxy.Aio.get_children(parent, includeTypes=["folder", "file"]):
+                is_file = child.get('type') == 'org.sagebionetworks.repo.model.FileEntity'
+                await _add_child(child.get('id'), child.get('name'), is_file=is_file)
 
         return remote_dirs, remote_files

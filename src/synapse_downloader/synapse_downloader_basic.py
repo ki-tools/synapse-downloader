@@ -48,15 +48,17 @@ class SynapseDownloaderBasic:
         try:
             Utils.ensure_dirs(self._download_path)
 
-            parent = await SynapseProxy.getAsync(self._starting_entity_id, downloadFile=False)
+            start_entity = await SynapseProxy.getAsync(self._starting_entity_id, downloadFile=False)
 
-            if type(parent) not in [syn.Project, syn.Folder]:
-                raise Exception('Starting entity must be a Project or Folder.')
+            if type(start_entity) not in [syn.Project, syn.Folder, syn.File]:
+                raise Exception('Starting entity must be a Project, Folder, or File.')
 
-            logging.info('Starting entity: {0} ({1})'.format(parent.name, parent.id))
+            start_is_file = isinstance(start_entity, syn.File)
+
+            logging.info('Starting entity: {0} ({1})'.format(start_entity.name, start_entity.id))
             logging.info('Downloading to: {0}'.format(self._download_path))
 
-            self._file_handle_view = FileHandleView(parent)
+            self._file_handle_view = FileHandleView(start_entity)
 
             if self._with_view:
                 await self._file_handle_view.load()
@@ -64,7 +66,11 @@ class SynapseDownloaderBasic:
                 logging.info('Total files: {0}'.format(self.total_files))
 
             self.start_time = datetime.now()
-            await self._download_children(parent, self._download_path)
+
+            if start_is_file:
+                await self._download_file(start_entity.id, self._download_path)
+            else:
+                await self._download_children(start_entity, self._download_path)
         except Exception as ex:
             logging.exception(ex)
             self.has_errors = True

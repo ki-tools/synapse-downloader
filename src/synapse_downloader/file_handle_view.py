@@ -12,24 +12,29 @@ class FileHandleView(dict):
         """
 
         Args:
-            scope: The Project or Folder to scope the view to.
+            scope: The Project, Folder, or File to scope the view to.
         """
         self.scope = scope
-        self.project = None
+        self.view_project = None
         self.view = None
 
     async def load(self):
         try:
-            await self._create()
-            logging.info('Querying file view...')
-            query = await SynapseProxy.tableQueryAsync('SELECT * FROM {0}'.format(self.view.id))
+            if isinstance(self.scope, syn.File):
+                self._add_item(self.scope.id, self.scope['dataFileHandleId'])
+            elif type(self.scope) in [syn.Project, syn.File]:
+                await self._create()
+                logging.info('Querying file view...')
+                query = await SynapseProxy.tableQueryAsync('SELECT * FROM {0}'.format(self.view.id))
 
-            id_col = self._get_table_column_index(query.headers, self.COL_ID)
-            col_datafilehandleid = self._get_table_column_index(query.headers, self.COL_DATAFILEHANDLEID)
+                id_col = self._get_table_column_index(query.headers, self.COL_ID)
+                col_datafilehandleid = self._get_table_column_index(query.headers, self.COL_DATAFILEHANDLEID)
 
-            logging.info('Loading file view...')
-            for row in query:
-                self._add_item(row[id_col], row[col_datafilehandleid])
+                logging.info('Loading file view...')
+                for row in query:
+                    self._add_item(row[id_col], row[col_datafilehandleid])
+            else:
+                raise Exception('Scope entity must be a Project, Folder, or File.')
         except Exception as ex:
             logging.exception(ex)
             raise
@@ -63,7 +68,7 @@ class FileHandleView(dict):
     async def _create(self):
         name = '_TEMP_{0}_TEMP_'.format(str(uuid.uuid4()))
         logging.info('Creating file view project: {0}'.format(name))
-        self.project = await SynapseProxy.storeAsync(syn.Project(name=name))
+        self.view_project = await SynapseProxy.storeAsync(syn.Project(name=name))
 
         logging.info('Creating file view: {0}'.format(name))
         cols = [
@@ -73,7 +78,7 @@ class FileHandleView(dict):
         schema = syn.EntityViewSchema(name=name,
                                       columns=cols,
                                       properties=None,
-                                      parent=self.project,
+                                      parent=self.view_project,
                                       scopes=[self.scope],
                                       includeEntityTypes=[syn.EntityViewType.FILE],
                                       addDefaultViewColumns=False,
@@ -81,6 +86,6 @@ class FileHandleView(dict):
         self.view = await SynapseProxy.storeAsync(schema)
 
     async def _delete(self):
-        if self.project:
-            logging.info('Deleting file view project: {0}'.format(self.project.name))
-            await SynapseProxy.deleteAsync(self.project)
+        if self.view_project:
+            logging.info('Deleting file view project: {0}'.format(self.view_project.name))
+            await SynapseProxy.deleteAsync(self.view_project)
