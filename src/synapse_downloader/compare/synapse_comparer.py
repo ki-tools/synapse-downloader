@@ -9,10 +9,17 @@ from ..file_handle_view import FileHandleView
 
 
 class SynapseComparer:
-    def __init__(self, starting_entity_id, local_path, with_view=False, username=None, password=None):
+    def __init__(self, starting_entity_id, local_path, with_view=False, ignores=None, username=None, password=None):
         self._starting_entity_id = starting_entity_id
         self._local_path = Utils.expand_path(local_path)
         self._with_view = with_view
+        self._ignores = []
+        for ignore in (ignores or []):
+            if ignore.lower().startswith('syn'):
+                self._ignores.append(ignore.lower())
+            else:
+                self._ignores.append(Utils.expand_path(ignore))
+
         self._username = username
         self._password = password
 
@@ -52,6 +59,8 @@ class SynapseComparer:
 
             logging.info('Starting entity: {0} ({1})'.format(start_entity.name, start_entity.id))
             logging.info('Local Path: {0}'.format(self._local_path))
+            if self._ignores:
+                logging.info('Ignoring: {0}'.format(', '.join(self._ignores)))
 
             self._file_handle_view = FileHandleView(start_entity)
 
@@ -95,8 +104,20 @@ class SynapseComparer:
                 progress_msg += ' of {0}'.format(self.total_remote_files)
 
             local_match = self._find_by_name(local_files, remote_file['name'])
+
+            if (remote_file['id'] in self._ignores) or (local_match and local_match.path in self._ignores):
+                self._log_info('[SKIPPING REMOTE FILE]',
+                               '  REMOTE [ ]: {0}({1})'.format(remote_file['name'], remote_file['id']))
+
+                if local_match:
+                    self._log_info('[SKIPPING LOCAL FILE]',
+                                   '  LOCAL  [ ]: {0}'.format(local_match.path))
+                    local_files.remove(local_match)
+                continue
+
             if local_match:
                 local_files.remove(local_match)
+
                 self._log_info('[LOCAL FILE FOUND] [{0}]'.format(progress_msg),
                                '  REMOTE [+]: {0}({1})'.format(remote_file['name'], remote_file['id']),
                                '  LOCAL  [+]: {0}'.format(local_match.path))
@@ -114,10 +135,10 @@ class SynapseComparer:
                     local_md5 = await Utils.get_md5(local_match.path)
                     if local_md5 != remote_md5:
                         self._log_error('[MD5 MISMATCH]',
-                                        '  REMOTE [{0}]: {1}({2})'.format(remote_md5,
-                                                                          remote_file['name'],
-                                                                          remote_file['id']),
-                                        '  LOCAL  [{0}]: {1}'.format(local_md5, local_match.path))
+                                        '  REMOTE [-]: {0}({1}) ({2})'.format(remote_file['name'],
+                                                                              remote_file['id'],
+                                                                              remote_md5),
+                                        '  LOCAL  [-]: {0} ({1})'.format(local_match.path, local_md5))
 
             else:
                 self._log_error('[LOCAL FILE NOT FOUND] [{0}]'.format(progress_msg),
@@ -126,8 +147,20 @@ class SynapseComparer:
 
         for remote_dir in remote_dirs:
             local_match = self._find_by_name(local_dirs, remote_dir['name'])
+
+            if (remote_dir['id'] in self._ignores) or (local_match and local_match.path in self._ignores):
+                self._log_info('[SKIPPING REMOTE DIRECTORY]',
+                               '  REMOTE [ ]: {0}({1})'.format(remote_dir['name'], remote_dir['id']))
+
+                if local_match:
+                    self._log_info('[SKIPPING LOCAL DIRECTORY]',
+                                   '  LOCAL  [ ]: {0}'.format(local_match.path))
+                    local_dirs.remove(local_match)
+                continue
+
             if local_match:
                 local_dirs.remove(local_match)
+
                 self._log_info('[LOCAL DIRECTORY FOUND]',
                                '  REMOTE [+]: {0}({1})'.format(remote_dir['name'], remote_dir['id']),
                                '  LOCAL  [+]: {0}'.format(local_match.path))
@@ -140,6 +173,17 @@ class SynapseComparer:
 
         for local_file in local_files:
             remote_match = self._find_by_name(remote_files, local_file.name)
+
+            if (local_file.path in self._ignores) or (remote_match and remote_match['id'] in self._ignores):
+                self._log_info('[SKIPPING LOCAL FILE]',
+                               '  LOCAL  [ ]: {0}'.format(local_file.path))
+
+                if remote_match:
+                    self._log_info('[SKIPPING REMOTE FILE]',
+                                   '  REMOTE [ ]: {0}({1})'.format(remote_match['name'], remote_match['id']))
+                    remote_files.remove(remote_match)
+                continue
+
             if remote_match:
                 remote_files.remove(remote_match)
                 self._log_info('[REMOTE FILE FOUND]',
@@ -152,11 +196,23 @@ class SynapseComparer:
 
         for local_dir in local_dirs:
             remote_match = self._find_by_name(remote_dirs, local_dir.name)
+
+            if (local_dir.path in self._ignores) or (remote_match and remote_match['id'] in self._ignores):
+                self._log_info('[SKIPPING LOCAL DIRECTORY]',
+                               '  LOCAL  [ ]: {0}'.format(local_dir.path))
+
+                if remote_match:
+                    self._log_info('[SKIPPING REMOTE DIRECTORY]',
+                                   '  REMOTE [ ]: {0}({1})'.format(remote_match['name'], remote_match['id']))
+                    remote_dirs.remove(remote_match)
+                continue
+
             if remote_match:
                 remote_dirs.remove(remote_match)
                 self._log_info('[REMOTE DIRECTORY FOUND]',
                                '  LOCAL  [+]: {0}'.format(local_dir.path),
-                               '  REMOTE [+]: {0}/{1}({2})'.format(parent['name'], remote_match['name'],
+                               '  REMOTE [+]: {0}/{1}({2})'.format(parent['name'],
+                                                                   remote_match['name'],
                                                                    remote_match['id']))
 
                 await self._check_path(remote_match, os.path.join(local_path, remote_match['name']))

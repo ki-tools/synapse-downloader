@@ -14,6 +14,7 @@ def _start_compare(args):
     SynapseComparer(args.entity_id,
                     args.download_path,
                     with_view=args.with_view,
+                    ignores=args.compare_ignore,
                     username=args.username,
                     password=args.password).start()
 
@@ -53,8 +54,10 @@ def main(args=None):
                         help='Compare a local directory against a remote project or folder.',
                         default=False,
                         action='store_true')
-    # TODO: make this work.
-    # parser.add_argument('-ci', '--compare-ignore', help='Path to directories or files to ignore when comparing.')
+    parser.add_argument('-ci', '--compare-ignore',
+                        help='Path to directories or files to ignore when comparing.',
+                        action='append',
+                        nargs='?')
 
     args = parser.parse_args(args)
 
