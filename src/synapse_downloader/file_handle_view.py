@@ -22,7 +22,7 @@ class FileHandleView(dict):
         try:
             if isinstance(self.scope, syn.File):
                 self._add_item(self.scope.id, self.scope['dataFileHandleId'])
-            elif type(self.scope) in [syn.Project, syn.File]:
+            elif type(self.scope) in [syn.Project, syn.Folder]:
                 await self._create()
                 logging.info('Querying file view...')
                 query = await SynapseProxy.tableQueryAsync('SELECT * FROM {0}'.format(self.view.id))
