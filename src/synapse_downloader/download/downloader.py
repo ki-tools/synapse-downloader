@@ -2,13 +2,11 @@ import os
 import logging
 from datetime import datetime
 import synapseclient as syn
-from .aio_manager import AioManager
-from .utils import Utils
-from .synapse_proxy import SynapseProxy
+from ..core import Utils, AioManager, SynapseProxy
 from .file_handle_view import FileHandleView
 
 
-class SynapseDownloaderBasic:
+class Downloader:
 
     def __init__(self, starting_entity_id, download_path, with_view=False, username=None, password=None):
         self._starting_entity_id = starting_entity_id
@@ -30,7 +28,7 @@ class SynapseDownloaderBasic:
         self.files_processed = 0
         self.has_errors = False
 
-        if SynapseProxy.login(username=self._username, password=self._password):
+        if SynapseProxy.logged_in() or SynapseProxy.login(username=self._username, password=self._password):
             AioManager.start(self._startAsync)
         else:
             self.has_errors = True
@@ -53,9 +51,7 @@ class SynapseDownloaderBasic:
             if type(start_entity) not in [syn.Project, syn.Folder, syn.File]:
                 raise Exception('Starting entity must be a Project, Folder, or File.')
 
-            start_is_file = isinstance(start_entity, syn.File)
-
-            logging.info('Starting entity: {0} ({1})'.format(start_entity.name, start_entity.id))
+            logging.info('Starting Download Entity: {0} ({1})'.format(start_entity.name, start_entity.id))
             logging.info('Downloading to: {0}'.format(self._download_path))
 
             self._file_handle_view = FileHandleView(start_entity)
@@ -67,7 +63,7 @@ class SynapseDownloaderBasic:
 
             self.start_time = datetime.now()
 
-            if start_is_file:
+            if isinstance(start_entity, syn.File):
                 await self._download_file(start_entity.id, self._download_path)
             else:
                 await self._download_children(start_entity, self._download_path)
@@ -87,9 +83,8 @@ class SynapseDownloaderBasic:
             else:
                 await self._download_file(child_id, local_path)
 
-        if syn_folders:
-            for syn_folder in syn_folders:
-                await self._download_folder(syn_folder['id'], syn_folder['name'], syn_folder['local_path'])
+        for syn_folder in syn_folders:
+            await self._download_folder(syn_folder['id'], syn_folder['name'], syn_folder['local_path'])
 
     async def _download_folder(self, syn_id, name, local_path):
         full_path = os.path.join(local_path, name)
@@ -101,7 +96,6 @@ class SynapseDownloaderBasic:
         try:
             filehandle = await self._file_handle_view.get_filehandle(syn_id)
 
-            url = filehandle.get('preSignedURL')
             filename = filehandle.get('fileHandle').get('fileName')
             remote_md5 = filehandle.get('fileHandle').get('contentMd5')
             content_size = filehandle.get('fileHandle').get('contentSize')
@@ -126,7 +120,10 @@ class SynapseDownloaderBasic:
                     logging.info('File is current.')
 
             if can_download:
-                await SynapseProxy.Aio.download_file(url, full_path, content_size)
+                await SynapseProxy.Aio.download_file(syn_id,
+                                                     full_path,
+                                                     filehandle,
+                                                     self._file_handle_view.get_filehandle)
         except Exception as ex:
             self.has_errors = True
             logging.exception(ex)

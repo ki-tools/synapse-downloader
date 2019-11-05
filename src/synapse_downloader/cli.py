@@ -1,22 +1,26 @@
 import os
 import argparse
 import logging
-from .utils import Utils
-from .synapse_proxy import SynapseProxy
-from .synapse_downloader import SynapseDownloader
-from .synapse_downloader_old import SynapseDownloaderOld
-from .synapse_downloader_sync import SynapseDownloaderSync
-from .synapse_downloader_basic import SynapseDownloaderBasic
-from .compare.synapse_comparer import SynapseComparer
+from .download import Downloader
+from .core import Utils, SynapseProxy
+from .compare.comparer import Comparer
+
+
+def _start_download(args):
+    Downloader(args.entity_id,
+               args.download_path,
+               with_view=args.with_view,
+               username=args.username,
+               password=args.password).start()
 
 
 def _start_compare(args):
-    SynapseComparer(args.entity_id,
-                    args.download_path,
-                    with_view=args.with_view,
-                    ignores=args.compare_ignore,
-                    username=args.username,
-                    password=args.password).start()
+    Comparer(args.entity_id,
+             args.download_path,
+             with_view=args.with_view,
+             ignores=args.compare_ignore,
+             username=args.username,
+             password=args.password).start()
 
 
 def main(args=None):
@@ -39,11 +43,6 @@ def main(args=None):
                         help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new or basic" and "-c"',
                         default=False,
                         action='store_true')
-    parser.add_argument('-s', '--strategy',
-                        help='Use the new or old download strategy',
-                        default='basic',
-                        choices=['new', 'old', 'sync', 'basic'])
-
     parser.add_argument('-wc', '--with-compare',
                         help='Run the comparison after downloading everything.',
                         default=False,
@@ -86,31 +85,10 @@ def main(args=None):
 
     if args.compare:
         _start_compare(args)
-    elif args.strategy == 'new':
-        SynapseDownloader(args.entity_id,
-                          args.download_path,
-                          with_view=args.with_view,
-                          username=args.username,
-                          password=args.password).start()
-    elif args.strategy == 'old':
-        SynapseDownloaderOld(args.entity_id,
-                             args.download_path,
-                             username=args.username,
-                             password=args.password).start()
-    elif args.strategy == 'sync':
-        SynapseDownloaderSync(args.entity_id,
-                              args.download_path,
-                              username=args.username,
-                              password=args.password).start()
-    elif args.strategy == 'basic':
-        SynapseDownloaderBasic(args.entity_id,
-                               args.download_path,
-                               with_view=args.with_view,
-                               username=args.username,
-                               password=args.password).start()
-
-    if args.with_compare and not args.compare:
-        _start_compare(args)
+    else:
+        _start_download(args)
+        if args.with_compare:
+            _start_compare(args)
 
 
 if __name__ == "__main__":

@@ -2,13 +2,12 @@ import os
 import logging
 import synapseclient as syn
 from datetime import datetime
-from ..utils import Utils
-from ..synapse_proxy import SynapseProxy
-from ..aio_manager import AioManager
-from ..file_handle_view import FileHandleView
+from ..core import Utils, SynapseProxy, AioManager
+from ..download import FileHandleView
 
 
-class SynapseComparer:
+class Comparer:
+
     def __init__(self, starting_entity_id, local_path, with_view=False, ignores=None, username=None, password=None):
         self._starting_entity_id = starting_entity_id
         self._local_path = Utils.expand_path(local_path)
@@ -36,7 +35,7 @@ class SynapseComparer:
         self.remote_files_processed = 0
         self.has_errors = False
 
-        if SynapseProxy.login(username=self._username, password=self._password):
+        if SynapseProxy.logged_in() or SynapseProxy.login(username=self._username, password=self._password):
             AioManager.start(self._startAsync)
         else:
             self.has_errors = True
@@ -57,8 +56,8 @@ class SynapseComparer:
             if type(start_entity) not in [syn.Project, syn.Folder, syn.File]:
                 raise Exception('Starting entity must be a Project, Folder, or File.')
 
-            logging.info('Starting entity: {0} ({1})'.format(start_entity.name, start_entity.id))
-            logging.info('Local Path: {0}'.format(self._local_path))
+            logging.info('Starting Compare Entity: {0} ({1})'.format(start_entity.name, start_entity.id))
+            logging.info('Comparing to: {0}'.format(self._local_path))
             if self._ignores:
                 logging.info('Ignoring: {0}'.format(', '.join(self._ignores)))
 

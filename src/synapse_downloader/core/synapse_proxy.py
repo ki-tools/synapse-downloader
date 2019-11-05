@@ -5,6 +5,7 @@ import asyncio
 import aiohttp
 import aiofiles
 import random
+import hashlib
 import synapseclient as syn
 import synapseclient.utils as syn_utils
 from functools import partial
@@ -37,6 +38,10 @@ class SynapseProxy:
             cls._synapse_client = None
             logging.error('Synapse login failed: {0}'.format(str(ex)))
 
+        return cls._synapse_client is not None
+
+    @classmethod
+    def logged_in(cls):
         return cls._synapse_client is not None
 
     @classmethod
@@ -120,19 +125,28 @@ class SynapseProxy:
                         raise
 
         @classmethod
-        async def download_file(cls, url, local_path, total_size):
+        async def download_file(cls, syn_id, local_path, filehandle, filehandle_func):
             # TODO: Add resume ability for downloads.
             max_attempts = 3
             attempt_number = 0
-            mb_total_size = Utils.pretty_size(total_size)
 
             while True:
                 try:
+                    if attempt_number > 0:
+                        # Get a new filehandle for retries so the preSignedURL is fresh.
+                        filehandle = await filehandle_func(syn_id)
+
+                    url = filehandle.get('preSignedURL')
+                    remote_md5 = filehandle.get('fileHandle').get('contentMd5')
+                    total_size = filehandle.get('fileHandle').get('contentSize')
+
+                    mb_total_size = Utils.pretty_size(total_size)
                     timeout = aiohttp.ClientTimeout(total=cls.FILE_DOWNLOAD_TIMEOUT)
 
                     async with AioManager.AIOSESSION.get(url, timeout=timeout) as response:
                         async with aiofiles.open(local_path, mode='wb') as fd:
                             bytes_read = 0
+                            download_md5 = hashlib.md5()
                             while True:
                                 chunk = await response.content.read(Utils.CHUNK_SIZE)
                                 if not chunk:
@@ -142,9 +156,20 @@ class SynapseProxy:
                                     'Saving {0} of {1}'.format(Utils.pretty_size(bytes_read), mb_total_size))
 
                                 await fd.write(chunk)
+                                download_md5.update(chunk)
+
                             Utils.print_inplace('')
                             logging.info('Saved {0}'.format(Utils.pretty_size(bytes_read)))
-                            assert bytes_read == total_size
+
+                            if bytes_read != total_size:
+                                raise Exception(
+                                    'Bytes downloaded: {0} does not match remote size: {1}'.format(bytes_read,
+                                                                                                   total_size))
+
+                            local_md5 = download_md5.hexdigest()
+                            if local_md5 != remote_md5:
+                                raise Exception(
+                                    'Local MD5: {0} does not match remote MD5: {1}'.format(local_md5, remote_md5))
                             break
                 except Exception as ex:
                     logging.exception(ex)

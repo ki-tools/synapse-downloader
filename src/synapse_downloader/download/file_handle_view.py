@@ -1,7 +1,7 @@
 import uuid
 import logging
 import synapseclient as syn
-from .synapse_proxy import SynapseProxy
+from ..core.synapse_proxy import SynapseProxy
 
 
 class FileHandleView(dict):
