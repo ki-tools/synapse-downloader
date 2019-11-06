@@ -2,12 +2,31 @@ import os
 import hashlib
 import aiofiles
 import math
+import pathlib
 
 
 class Utils:
     KB = 1024
     MB = KB * KB
     CHUNK_SIZE = 10 * MB
+
+    @staticmethod
+    def app_dir():
+        """Gets the application's primary directory for the current user.
+
+        Returns:
+            Absolute path to the directory.
+        """
+        return os.path.join(pathlib.Path.home(), '.syntools')
+
+    @staticmethod
+    def app_log_dir():
+        """Gets the applications primary log directory for the current user.
+
+        Returns:
+            Absolute path to the directory.
+        """
+        return os.path.join(Utils.app_dir(), 'logs')
 
     @staticmethod
     def expand_path(local_path):

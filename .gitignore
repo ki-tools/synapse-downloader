@@ -23,4 +23,4 @@ var/
 .coverage
 htmlcov
 tests/private.*
-log*.txt
+*.log

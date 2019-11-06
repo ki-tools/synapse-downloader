@@ -1,6 +1,7 @@
 import os
 import argparse
 import logging
+from datetime import datetime
 from .download import Downloader
 from .core import Utils, SynapseProxy
 from .compare.comparer import Comparer
@@ -27,22 +28,37 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('entity_id',
                         metavar='entity-id',
-                        help='The ID of the Synapse entity to download or compare (Project or Folder).')
+                        help='The ID of the Synapse entity to download or compare (Project, Folder or File).')
+
     parser.add_argument('download_path',
                         metavar='download-path',
                         help='The local path to save the files to or to compare.')
-    parser.add_argument('-u', '--username', help='Synapse username.', default=None)
-    parser.add_argument('-p', '--password', help='Synapse password.', default=None)
-    parser.add_argument('-ll', '--log-level', help='Set the logging level.', default='INFO')
-    parser.add_argument('-lf', '--log-file', help='Set path to a log file.', default='log.txt')
+
+    parser.add_argument('-u', '--username',
+                        help='Synapse username.',
+                        default=None)
+
+    parser.add_argument('-p', '--password',
+                        help='Synapse password.',
+                        default=None)
+
+    parser.add_argument('-ll', '--log-level',
+                        help='Set the logging level.',
+                        default='INFO')
+
+    parser.add_argument('-ld', '--log-dir',
+                        help='Set the directory where the log file will be written.')
+
     parser.add_argument('-dt', '--download-timeout',
                         help='Set the maximum time (in seconds) a file can download before it is canceled.',
                         type=int,
                         default=SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT)
+
     parser.add_argument('-w', '--with-view',
                         help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new or basic" and "-c"',
                         default=False,
                         action='store_true')
+
     parser.add_argument('-wc', '--with-compare',
                         help='Run the comparison after downloading everything.',
                         default=False,
@@ -53,6 +69,7 @@ def main(args=None):
                         help='Compare a local directory against a remote project or folder.',
                         default=False,
                         action='store_true')
+
     parser.add_argument('-ci', '--compare-ignore',
                         help='Path to directories or files to ignore when comparing.',
                         action='append',
@@ -61,7 +78,15 @@ def main(args=None):
     args = parser.parse_args(args)
 
     log_level = getattr(logging, args.log_level.upper())
-    log_filename = Utils.expand_path(args.log_file)
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    log_filename = '{0}.log'.format(timestamp)
+
+    if args.log_dir:
+        log_filename = os.path.join(Utils.expand_path(args.log_dir), log_filename)
+    else:
+        log_filename = os.path.join(Utils.app_log_dir(), log_filename)
+
     Utils.ensure_dirs(os.path.dirname(log_filename))
 
     logging.basicConfig(
@@ -89,6 +114,8 @@ def main(args=None):
         _start_download(args)
         if args.with_compare:
             _start_compare(args)
+
+    print('Output logged to: {0}'.format(log_filename))
 
 
 if __name__ == "__main__":

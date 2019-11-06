@@ -33,7 +33,7 @@ class SynapseProxy:
             syn.utils.printTransferProgress = lambda *a, **k: None
 
             cls._synapse_client = syn.Synapse(skip_checks=True)
-            cls._synapse_client.login(username, password, silent=True, rememberMe=False)
+            cls._synapse_client.login(username, password, silent=True)
         except Exception as ex:
             cls._synapse_client = None
             logging.error('Synapse login failed: {0}'.format(str(ex)))
