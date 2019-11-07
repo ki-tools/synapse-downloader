@@ -41,7 +41,7 @@ class Comparer:
             self.has_errors = True
 
         self.end_time = datetime.now()
-        self._log_info('Run time: {0}'.format(self.end_time - (self.start_time or datetime.now())), pad_top=True)
+        self._log_info('Run time: {0}'.format(self.end_time - (self.start_time or datetime.now())))
 
         if self.has_errors:
             logging.error('Finished with errors. See log file.')
@@ -78,15 +78,11 @@ class Comparer:
             logging.exception(ex)
             self._log_error('Unknown error. See log file.')
 
-    def _log_error(self, *msg, pad_top=False):
+    def _log_error(self, *msg):
         self.has_errors = True
-        if pad_top:
-            logging.info('')
         logging.error('\n'.join(msg))
 
-    def _log_info(self, *msg, pad_top=False):
-        if pad_top:
-            logging.info('')
+    def _log_info(self, *msg):
         logging.info('\n'.join(msg))
 
     async def _check_path(self, parent, local_path, remote_file=None):
@@ -110,12 +106,12 @@ class Comparer:
             if (remote_file['id'] in self._ignores) or (local_match and local_match.path in self._ignores):
                 self._log_info('[SKIPPING REMOTE FILE]',
                                '  REMOTE [ ]: {0}({1})'.format(remote_file['name'], remote_file['id']),
-                               pad_top=True)
+                               '')
 
                 if local_match:
                     self._log_info('[SKIPPING LOCAL FILE]',
                                    '  LOCAL  [ ]: {0}'.format(local_match.path),
-                                   pad_top=True)
+                                   '')
                     local_files.remove(local_match)
                 continue
 
@@ -125,7 +121,7 @@ class Comparer:
                 self._log_info('[LOCAL FILE FOUND] [{0}]'.format(progress_msg),
                                '  REMOTE [+]: {0}({1})'.format(remote_file['name'], remote_file['id']),
                                '  LOCAL  [+]: {0}'.format(local_match.path),
-                               pad_top=True)
+                               '')
 
                 remote_size = remote_file['content_size']
                 local_size = os.path.getsize(local_match.path)
@@ -135,7 +131,7 @@ class Comparer:
                                                                           remote_file['id'],
                                                                           Utils.pretty_size(remote_size)),
                                     '  LOCAL  [-]: {0} ({1})'.format(local_match.path, Utils.pretty_size(local_size)),
-                                    pad_top=True)
+                                    '')
                 else:
                     remote_md5 = remote_file['content_md5']
                     local_md5 = await Utils.get_md5(local_match.path)
@@ -145,13 +141,13 @@ class Comparer:
                                                                               remote_file['id'],
                                                                               remote_md5),
                                         '  LOCAL  [-]: {0} ({1})'.format(local_match.path, local_md5),
-                                        pad_top=True)
+                                        '')
 
             else:
                 self._log_error('[LOCAL FILE NOT FOUND] [{0}]'.format(progress_msg),
                                 '  REMOTE [+]: {0}({1})'.format(remote_file['name'], remote_file['id']),
                                 '  LOCAL  [-]: {0}'.format(os.path.join(local_path, remote_file['name'])),
-                                pad_top=True)
+                                '')
 
         for remote_dir in remote_dirs:
             local_match = self._find_by_name(local_dirs, remote_dir['name'])
@@ -159,12 +155,12 @@ class Comparer:
             if (remote_dir['id'] in self._ignores) or (local_match and local_match.path in self._ignores):
                 self._log_info('[SKIPPING REMOTE DIRECTORY]',
                                '  REMOTE [ ]: {0}({1})'.format(remote_dir['name'], remote_dir['id']),
-                               pad_top=True)
+                               '')
 
                 if local_match:
                     self._log_info('[SKIPPING LOCAL DIRECTORY]',
                                    '  LOCAL  [ ]: {0}'.format(local_match.path),
-                                   pad_top=True)
+                                   '')
                     local_dirs.remove(local_match)
                 continue
 
@@ -174,14 +170,14 @@ class Comparer:
                 self._log_info('[LOCAL DIRECTORY FOUND]',
                                '  REMOTE [+]: {0}({1})'.format(remote_dir['name'], remote_dir['id']),
                                '  LOCAL  [+]: {0}'.format(local_match.path),
-                               pad_top=True)
+                               '')
 
                 await self._check_path(remote_dir, os.path.join(local_path, remote_dir['name']))
             else:
                 self._log_error('[LOCAL DIRECTORY NOT FOUND]',
                                 '  REMOTE [+]: {0}({1})'.format(remote_dir['name'], remote_dir['id']),
                                 '  LOCAL  [-]: {0}'.format(os.path.join(local_path, remote_dir['name'])),
-                                pad_top=True)
+                                '')
 
         for local_file in local_files:
             remote_match = self._find_by_name(remote_files, local_file.name)
@@ -189,12 +185,12 @@ class Comparer:
             if (local_file.path in self._ignores) or (remote_match and remote_match['id'] in self._ignores):
                 self._log_info('[SKIPPING LOCAL FILE]',
                                '  LOCAL  [ ]: {0}'.format(local_file.path),
-                               pad_top=True)
+                               '')
 
                 if remote_match:
                     self._log_info('[SKIPPING REMOTE FILE]',
                                    '  REMOTE [ ]: {0}({1})'.format(remote_match['name'], remote_match['id']),
-                                   pad_top=True)
+                                   '')
                     remote_files.remove(remote_match)
                 continue
 
@@ -203,12 +199,12 @@ class Comparer:
                 self._log_info('[REMOTE FILE FOUND]',
                                '  LOCAL  [+]: {0}'.format(local_file.path),
                                '  REMOTE [+]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_file.name),
-                               pad_top=True)
+                               '')
             else:
                 self._log_error('[REMOTE FILE NOT FOUND]',
                                 '  LOCAL  [+]: {0}'.format(local_file.path),
                                 '  REMOTE [-]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_file.name),
-                                pad_top=True)
+                                '')
 
         for local_dir in local_dirs:
             remote_match = self._find_by_name(remote_dirs, local_dir.name)
@@ -216,12 +212,12 @@ class Comparer:
             if (local_dir.path in self._ignores) or (remote_match and remote_match['id'] in self._ignores):
                 self._log_info('[SKIPPING LOCAL DIRECTORY]',
                                '  LOCAL  [ ]: {0}'.format(local_dir.path),
-                               pad_top=True)
+                               '')
 
                 if remote_match:
                     self._log_info('[SKIPPING REMOTE DIRECTORY]',
                                    '  REMOTE [ ]: {0}({1})'.format(remote_match['name'], remote_match['id']),
-                                   pad_top=True)
+                                   '')
                     remote_dirs.remove(remote_match)
                 continue
 
@@ -232,14 +228,14 @@ class Comparer:
                                '  REMOTE [+]: {0}/{1}({2})'.format(parent['name'],
                                                                    remote_match['name'],
                                                                    remote_match['id']),
-                               pad_top=True)
+                               '')
 
                 await self._check_path(remote_match, os.path.join(local_path, remote_match['name']))
             else:
                 self._log_error('[REMOTE DIRECTORY NOT FOUND]',
                                 '  LOCAL  [+]: {0}'.format(local_dir.path),
                                 '  REMOTE [-]: {0}({1})/{2}'.format(parent['name'], parent['id'], local_dir.name),
-                                pad_top=True)
+                                '')
 
     def _find_by_name(self, _list, name):
         """Finds an item by its name property in a list.
