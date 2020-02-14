@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/ki-tools/synapse-downloader.svg?branch=master)](https://travis-ci.org/ki-tools/synapse-downloader)
+[![Coverage Status](https://coveralls.io/repos/github/ki-tools/synapse-downloader/badge.svg?branch=master)](https://coveralls.io/github/ki-tools/synapse-downloader?branch=master)
+
 # Synapse Downloader
 
 Utility for downloading large datasets from Synapse.
