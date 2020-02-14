@@ -55,7 +55,7 @@ def main(args=None):
                         default=SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT)
 
     parser.add_argument('-w', '--with-view',
-                        help='Use an entity view for loading file info. Fastest for large projects. Only available for "-s new or basic" and "-c"',
+                        help='Use an entity view for loading file info. Fastest for large projects.',
                         default=False,
                         action='store_true')
 

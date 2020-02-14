@@ -6,6 +6,15 @@ verify_ssl = true
 [dev-packages]
 pytest = "*"
 twine = "*"
+pytest-asyncio = "*"
+pytest-cov = "*"
+coverage = "*"
+coveralls = "*"
+pytest-mock = "*"
+pytest-pylint = "*"
+pylint = "*"
+wheel = "*"
+autopep8 = "*"
 
 [packages]
 synapseclient = "*"
