@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="synapse-downloader",
-    version="0.0.1",
+    version="0.0.2",
     author="Patrick Stout",
     author_email="pstout@prevagroup.com",
     license="Apache2",
@@ -27,7 +27,7 @@ setuptools.setup(
         ]
     },
     install_requires=[
-        "synapseclient>=1.9.2,<2.0.0",
+        "synapseclient>=2.1.0,<3.0.0",
         "aiohttp",
         "aiofiles"
     ]
