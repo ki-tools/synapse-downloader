@@ -1,6 +1,6 @@
 # Change Log
 
-## Version 0.0.2 (2020-06-23)
+## Version 0.0.2 (2020-06-24)
 ### Added
 - Upgraded synapseclient to version 2.1.0
 
