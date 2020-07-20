@@ -8,12 +8,18 @@ from .file_handle_view import FileHandleView
 
 class Downloader:
 
-    def __init__(self, starting_entity_id, download_path, with_view=False, username=None, password=None):
+    def __init__(self, starting_entity_id, download_path, excludes=None, with_view=False, username=None, password=None):
         self._starting_entity_id = starting_entity_id
         self._download_path = Utils.expand_path(download_path)
         self._with_view = with_view
         self._username = username
         self._password = password
+        self._excludes = []
+        for exclude in (excludes or []):
+            if exclude.lower().strip().startswith('syn'):
+                self._excludes.append(exclude.lower().strip())
+            else:
+                self._excludes.append(exclude)
 
         self.start_time = None
         self.end_time = None
@@ -53,6 +59,8 @@ class Downloader:
 
             logging.info('Starting Download Entity: {0} ({1})'.format(start_entity.name, start_entity.id))
             logging.info('Downloading to: {0}'.format(self._download_path))
+            if self._excludes:
+                logging.info('Excluding: {0}'.format(','.join(self._excludes)))
 
             self._file_handle_view = FileHandleView(start_entity)
 
@@ -88,9 +96,16 @@ class Downloader:
 
     async def _download_folder(self, syn_id, name, local_path):
         full_path = os.path.join(local_path, name)
-        logging.info('Folder: {0} -> {1}'.format(full_path.replace(self._download_path, ''), full_path))
-        Utils.ensure_dirs(full_path)
-        await self._download_children(syn_id, full_path)
+        full_remote_path = full_path.replace(self._download_path, '')
+
+        if syn_id in self._excludes or \
+                name in self._excludes or \
+                full_remote_path in self._excludes:
+            logging.info('Skipping Folder: {0} ({1})'.format(full_remote_path, syn_id))
+        else:
+            logging.info('Folder: {0} -> {1}'.format(full_remote_path, full_path))
+            Utils.ensure_dirs(full_path)
+            await self._download_children(syn_id, full_path)
 
     async def _download_file(self, syn_id, local_path):
         try:
@@ -101,29 +116,42 @@ class Downloader:
             content_size = filehandle.get('fileHandle').get('contentSize')
 
             full_path = os.path.join(local_path, filename)
+            full_remote_path = full_path.replace(self._download_path, '')
 
             progress_msg = str(self.files_processed + 1)
             if self.total_files is not None:
                 progress_msg += ' of {0}'.format(self.total_files)
 
-            logging.info(
-                'File  : {0} -> {1} [{2}]'.format(full_path.replace(self._download_path, ''), full_path, progress_msg))
+            # Only fetch the entity name if there are excludes since this adds time.
+            excludable_name = None
+            if self._excludes:
+                view_data = await self._file_handle_view.get(syn_id)
+                excludable_name = view_data[FileHandleView.COL_NAME]
 
-            can_download = True
+            if syn_id in self._excludes or \
+                    filename in self._excludes or \
+                    full_remote_path in self._excludes or \
+                    (excludable_name is not None and excludable_name in self._excludes):
+                logging.info('Skipping File: {0} ({1})'.format(full_remote_path, syn_id))
+            else:
+                logging.info(
+                    'File  : {0} -> {1} [{2}]'.format(full_remote_path, full_path, progress_msg))
 
-            # Only check the md5 if the file sizes match.
-            # This way we can avoid MD5 checking for partial downloads and changed files.
-            if os.path.isfile(full_path) and os.path.getsize(full_path) == content_size:
-                local_md5 = await Utils.get_md5(full_path)
-                if local_md5 == remote_md5:
-                    can_download = False
-                    logging.info('File is current.')
+                can_download = True
 
-            if can_download:
-                await SynapseProxy.Aio.download_file(syn_id,
-                                                     full_path,
-                                                     filehandle,
-                                                     self._file_handle_view.get_filehandle)
+                # Only check the md5 if the file sizes match.
+                # This way we can avoid MD5 checking for partial downloads and changed files.
+                if os.path.isfile(full_path) and os.path.getsize(full_path) == content_size:
+                    local_md5 = await Utils.get_md5(full_path)
+                    if local_md5 == remote_md5:
+                        can_download = False
+                        logging.info('File is current.')
+
+                if can_download:
+                    await SynapseProxy.Aio.download_file(syn_id,
+                                                         full_path,
+                                                         filehandle,
+                                                         self._file_handle_view.get_filehandle)
         except Exception as ex:
             self.has_errors = True
             logging.exception(ex)

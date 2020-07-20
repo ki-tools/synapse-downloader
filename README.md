@@ -28,9 +28,9 @@ SYNAPSE_PASSWORD=your-synapse-password
 ## Usage
 
 ```text
-usage: synapse-downloader [-h] [-u USERNAME] [-p PASSWORD] [-ll LOG_LEVEL]
-                          [-ld LOG_DIR] [-dt DOWNLOAD_TIMEOUT] [-w] [-wc] [-c]
-                          [-ci [COMPARE_IGNORE]]
+usage: synapse-downloader [-h] [-e [EXCLUDE]] [-u USERNAME] [-p PASSWORD]
+                          [-ll LOG_LEVEL] [-ld LOG_DIR] [-dt DOWNLOAD_TIMEOUT]
+                          [-w] [-wc] [-c] [-ci [COMPARE_IGNORE]]
                           entity-id download-path
 
 positional arguments:
@@ -40,6 +40,9 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  -e [EXCLUDE], --exclude [EXCLUDE]
+                        Items to exclude from download. Synapse IDs or names
+                        (names are case-sensitive).
   -u USERNAME, --username USERNAME
                         Synapse username.
   -p PASSWORD, --password PASSWORD
@@ -58,7 +61,6 @@ optional arguments:
                         folder.
   -ci [COMPARE_IGNORE], --compare-ignore [COMPARE_IGNORE]
                         Path to directories or files to ignore when comparing.
-
 ```
 
 ## Development Setup

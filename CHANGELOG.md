@@ -1,5 +1,9 @@
 # Change Log
 
+## Version 0.0.3 (2020-07-20)
+### Added
+- Added `--exclude` argument.
+
 ## Version 0.0.2 (2020-06-24)
 ### Added
 - Upgraded synapseclient to version 2.1.0
