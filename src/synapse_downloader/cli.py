@@ -10,6 +10,7 @@ from .compare.comparer import Comparer
 def _start_download(args):
     Downloader(args.entity_id,
                args.download_path,
+               args.exclude,
                with_view=args.with_view,
                username=args.username,
                password=args.password).start()
@@ -33,6 +34,10 @@ def main(args=None):
     parser.add_argument('download_path',
                         metavar='download-path',
                         help='The local path to save the files to or to compare.')
+
+    parser.add_argument('-e', '--exclude',
+                        help='Items to exclude from download. Synapse IDs or names (names are case-sensitive).',
+                        action='append', nargs='?')
 
     parser.add_argument('-u', '--username',
                         help='Synapse username.',

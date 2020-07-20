@@ -14,8 +14,8 @@ class Comparer:
         self._with_view = with_view
         self._ignores = []
         for ignore in (ignores or []):
-            if ignore.lower().startswith('syn'):
-                self._ignores.append(ignore.lower())
+            if ignore.lower().strip().startswith('syn'):
+                self._ignores.append(ignore.lower().strip())
             else:
                 self._ignores.append(Utils.expand_path(ignore))
 
