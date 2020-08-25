@@ -125,7 +125,18 @@ class Comparer:
 
                 remote_size = remote_file['content_size']
                 local_size = os.path.getsize(local_match.path)
-                if local_size != remote_size:
+                # NOTE: For ExternalFileHandles the size and MD5 data will not be present.
+                is_unknown_size = remote_size is None
+
+                if is_unknown_size:
+                    # TODO: Should we download the ExternalFileHandle and check its size?
+                    self._log_info('[REMOTE SIZE UNKNOWN]',
+                                   '  REMOTE [?]: {0}({1}) ({2})'.format(remote_file['name'],
+                                                                         remote_file['id'],
+                                                                         Utils.pretty_size(remote_size)),
+                                   '  LOCAL  [+]: {0} ({1})'.format(local_match.path, Utils.pretty_size(local_size)),
+                                   '')
+                elif local_size != remote_size:
                     self._log_error('[SIZE MISMATCH]',
                                     '  REMOTE [-]: {0}({1}) ({2})'.format(remote_file['name'],
                                                                           remote_file['id'],

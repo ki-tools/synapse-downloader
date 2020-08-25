@@ -76,7 +76,9 @@ class Utils:
 
     @staticmethod
     def pretty_size(size):
-        if size > 0:
+        if size is None:
+            return 'Unknown'
+        elif size > 0:
             i = int(math.floor(math.log(size, 1024)))
             p = math.pow(1024, i)
             s = round(size / p, 2)

@@ -5,6 +5,7 @@ from datetime import datetime
 from .download import Downloader
 from .core import Utils, SynapseProxy
 from .compare.comparer import Comparer
+from ._version import __version__
 
 
 def _start_download(args):
@@ -27,6 +28,7 @@ def _start_compare(args):
 
 def main(args=None):
     parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version', version='%(prog)s {0}'.format(__version__))
     parser.add_argument('entity_id',
                         metavar='entity-id',
                         help='The ID of the Synapse entity to download or compare (Project, Folder or File).')

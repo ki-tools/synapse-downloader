@@ -255,4 +255,6 @@ def test_it_excludes_files_by_filename(syn_data, reset_download_dir):
                                    expect=all_syn_folders,
                                    not_expect=all_syn_files)
 
+# TODO: test downloading files of: 'concreteType': 'org.sagebionetworks.repo.model.file.ExternalFileHandle'
+
 # TODO: Add additional tests...
