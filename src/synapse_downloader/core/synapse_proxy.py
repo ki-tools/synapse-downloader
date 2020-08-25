@@ -138,8 +138,10 @@ class SynapseProxy:
                     url = filehandle.get('preSignedURL')
                     remote_md5 = filehandle.get('fileHandle').get('contentMd5')
                     total_size = filehandle.get('fileHandle').get('contentSize')
+                    # NOTE: For ExternalFileHandles the size and MD5 data will not be present.
+                    is_unknown_size = total_size is None
 
-                    mb_total_size = Utils.pretty_size(total_size)
+                    pretty_size = Utils.pretty_size(total_size)
                     timeout = aiohttp.ClientTimeout(total=cls.FILE_DOWNLOAD_TIMEOUT)
 
                     async with AioManager.AIOSESSION.get(url, timeout=timeout) as response:
@@ -152,7 +154,7 @@ class SynapseProxy:
                                     break
                                 bytes_read += len(chunk)
                                 Utils.print_inplace(
-                                    'Saving {0} of {1}'.format(Utils.pretty_size(bytes_read), mb_total_size))
+                                    'Saving {0} of {1}'.format(Utils.pretty_size(bytes_read), pretty_size))
 
                                 await fd.write(chunk)
                                 download_md5.update(chunk)
@@ -160,15 +162,16 @@ class SynapseProxy:
                             Utils.print_inplace('')
                             logging.info('Saved {0}'.format(Utils.pretty_size(bytes_read)))
 
-                            if bytes_read != total_size:
-                                raise Exception(
-                                    'Bytes downloaded: {0} does not match remote size: {1}'.format(bytes_read,
-                                                                                                   total_size))
+                            if not is_unknown_size:
+                                if bytes_read != total_size:
+                                    raise Exception(
+                                        'Bytes downloaded: {0} does not match remote size: {1}'.format(bytes_read,
+                                                                                                       total_size))
 
-                            local_md5 = download_md5.hexdigest()
-                            if local_md5 != remote_md5:
-                                raise Exception(
-                                    'Local MD5: {0} does not match remote MD5: {1}'.format(local_md5, remote_md5))
+                                local_md5 = download_md5.hexdigest()
+                                if local_md5 != remote_md5:
+                                    raise Exception(
+                                        'Local MD5: {0} does not match remote MD5: {1}'.format(local_md5, remote_md5))
                             break
                 except Exception as ex:
                     logging.exception(ex)

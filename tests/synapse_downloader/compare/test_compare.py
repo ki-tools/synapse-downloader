@@ -58,4 +58,6 @@ def test_it_compares_everything_with_entity_view(syn_data, capsys):
     assert comparer.has_errors is False
     # TODO: Figure out how to test the view was used.
 
+# TODO: test comparing files of: 'concreteType': 'org.sagebionetworks.repo.model.file.ExternalFileHandle'
+
 # TODO: Add additional tests...

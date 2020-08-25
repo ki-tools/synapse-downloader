@@ -114,6 +114,8 @@ class Downloader:
             filename = filehandle.get('fileHandle').get('fileName')
             remote_md5 = filehandle.get('fileHandle').get('contentMd5')
             content_size = filehandle.get('fileHandle').get('contentSize')
+            # NOTE: For ExternalFileHandles the size and MD5 data will not be present.
+            is_unknown_size = content_size is None
 
             full_path = os.path.join(local_path, filename)
             full_remote_path = full_path.replace(self._download_path, '')
@@ -139,9 +141,11 @@ class Downloader:
 
                 can_download = True
 
-                # Only check the md5 if the file sizes match.
-                # This way we can avoid MD5 checking for partial downloads and changed files.
-                if os.path.isfile(full_path) and os.path.getsize(full_path) == content_size:
+                if is_unknown_size:
+                    logging.info('External File, cannot determine changes. Force downloading...')
+                elif os.path.isfile(full_path) and os.path.getsize(full_path) == content_size:
+                    # Only check the md5 if the file sizes match.
+                    # This way we can avoid MD5 checking for partial downloads and changed files.
                     local_md5 = await Utils.get_md5(full_path)
                     if local_md5 == remote_md5:
                         can_download = False
