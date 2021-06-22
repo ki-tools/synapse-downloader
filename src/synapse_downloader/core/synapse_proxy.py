@@ -6,7 +6,6 @@ import aiohttp
 import aiofiles
 import random
 import hashlib
-import base64
 import synapseclient as syn
 from functools import partial
 from .utils import Utils
