@@ -99,17 +99,33 @@ class SynapseProxy:
         FILE_DOWNLOAD_TIMEOUT = 60 * 60
 
         @classmethod
+        def _get_syn_http_headers(cls, url, endpoint=None, headers=None):
+            if headers is None:
+                headers = {}
+
+            uri, syn_headers = SynapseProxy.client()._build_uri_and_headers(url, endpoint=endpoint, headers=headers)
+
+            headers.update(syn_headers)
+
+            # This is needed for newer versions of the synapseclient.
+            # Older versions will have the signature from _build_uri_and_headers.
+            if not 'signature' in headers:
+                signed_headers = SynapseProxy.client().credentials.get_signed_headers(uri)
+                headers.update(signed_headers)
+
+            if 'signature' in headers and isinstance(headers['signature'], bytes):
+                headers['signature'] = headers['signature'].decode("utf-8")
+
+            return uri, headers
+
+        @classmethod
         async def rest_post(cls, url, endpoint=None, headers=None, body=None):
             max_attempts = 3
             attempt_number = 0
 
             while True:
                 try:
-                    uri, headers = SynapseProxy.client()._build_uri_and_headers(url, endpoint=endpoint, headers=headers)
-
-                    if 'signature' in headers and isinstance(headers['signature'], bytes):
-                        headers['signature'] = headers['signature'].decode("utf-8")
-
+                    uri, headers = cls._get_syn_http_headers(url, endpoint=endpoint, headers=headers)
                     async with AioManager.AIOSESSION.post(uri, headers=headers, json=body) as response:
                         return await response.json()
                 except Exception as ex:
