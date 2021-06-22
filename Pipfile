@@ -18,7 +18,7 @@ autopep8 = "*"
 
 [packages]
 synapseclient = "*"
-aiohttp = "*"
+aiohttp = ">=3.7.4"
 aiofiles = "*"
 
 [requires]
