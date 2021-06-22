@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "8850aa46f90302e164503384f33191c29521da86fbd28bceaccb1e1c314ed672"
+            "sha256": "71d6a2d3d056d9d674053082cd7f7a3b6adab320b674b066de1aeea999794723"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -286,6 +286,7 @@
                 "sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342",
                 "sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84"
             ],
+            "markers": "python_version < '3.8'",
             "version": "==3.10.0.0"
         },
         "urllib3": {
@@ -578,7 +579,6 @@
                 "sha256:7d59b6622675ca9e993a6bd38de845051d315f8b0c72cca3aef733a20b648657",
                 "sha256:aec56c0eb1691a841795111e184e13cad504f7703b9a64f63020816afa79a8ae"
             ],
-            "markers": "sys_platform == 'linux'",
             "version": "==0.6.0"
         },
         "keyring": {
@@ -832,6 +832,7 @@
                 "sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342",
                 "sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84"
             ],
+            "markers": "python_version < '3.8'",
             "version": "==3.10.0.0"
         },
         "urllib3": {
