@@ -27,26 +27,30 @@ class Downloader:
         self._file_handle_view = None
         self.total_files = None
         self.files_processed = 0
-        self.has_errors = False
+        self.errors = []
 
     def start(self):
         self.total_files = None
         self.files_processed = 0
-        self.has_errors = False
+        self.errors = []
 
         if SynapseProxy.logged_in() or SynapseProxy.login(username=self._username, password=self._password):
             AioManager.start(self._startAsync)
         else:
-            self.has_errors = True
+            self._log_error('Could not login to Synapse.')
 
         self.end_time = datetime.now()
         logging.info('')
         logging.info('Run time: {0}'.format(self.end_time - (self.start_time or datetime.now())))
+        return self
 
-        if self.has_errors:
-            logging.error('Finished with errors. Please see log file.')
+    def _log_error(self, msg):
+        if isinstance(msg, Exception):
+            self.errors.append(str(msg))
+            logging.exception(msg)
         else:
-            logging.info('Finished successfully.')
+            self.errors.append(msg)
+            logging.error(msg)
 
     async def _startAsync(self):
         try:
@@ -76,8 +80,7 @@ class Downloader:
             else:
                 await self._download_children(start_entity, self._download_path)
         except Exception as ex:
-            logging.exception(ex)
-            self.has_errors = True
+            self._log_error(ex)
 
     async def _download_children(self, parent, local_path):
         syn_folders = []
@@ -157,7 +160,6 @@ class Downloader:
                                                          filehandle,
                                                          self._file_handle_view.get_filehandle)
         except Exception as ex:
-            self.has_errors = True
-            logging.exception(ex)
+            self._log_error(ex)
 
         self.files_processed += 1

@@ -93,7 +93,7 @@ def test_it_downloads_everything(syn_data, reset_download_dir):
 
     downloader = Downloader(project.id, download_dir)
     downloader.start()
-    assert downloader.has_errors is False
+    assert len(downloader.errors) == 0
     assert_local_download_data(syn_data, expect=all_syn_entities)
 
 
@@ -105,7 +105,7 @@ def test_it_downloads_everything_with_entity_view(syn_data, reset_download_dir):
 
     downloader = Downloader(project.id, download_dir, with_view=True)
     downloader.start()
-    assert downloader.has_errors is False
+    assert len(downloader.errors) == 0
     # TODO: Figure out how to test the view was used.
     assert_local_download_data(syn_data, expect=all_syn_entities)
 
@@ -123,7 +123,7 @@ def test_it_excludes_folders_by_id(syn_data, reset_download_dir):
         reset_download_dir(syn_data)
         downloader = Downloader(project.id, download_dir, with_view=with_view, excludes=[syn_folder1.id])
         downloader.start()
-        assert downloader.has_errors is False
+        assert len(downloader.errors) == 0
         assert_local_download_data(syn_data,
                                    expect=[syn_file0],
                                    not_expect=[syn_folder1, syn_file1, syn_folder2, syn_file2])
@@ -131,7 +131,7 @@ def test_it_excludes_folders_by_id(syn_data, reset_download_dir):
         reset_download_dir(syn_data)
         downloader = Downloader(project.id, download_dir, with_view=with_view, excludes=[syn_folder2.id])
         downloader.start()
-        assert downloader.has_errors is False
+        assert len(downloader.errors) == 0
         assert_local_download_data(syn_data,
                                    expect=[syn_file0, syn_folder1, syn_file1],
                                    not_expect=[syn_folder2, syn_file2])
@@ -150,7 +150,7 @@ def test_it_excludes_folders_by_name(syn_data, reset_download_dir):
         reset_download_dir(syn_data)
         downloader = Downloader(project.id, download_dir, with_view=with_view, excludes=[syn_folder1.name])
         downloader.start()
-        assert downloader.has_errors is False
+        assert len(downloader.errors) == 0
         assert_local_download_data(syn_data,
                                    expect=[syn_file0],
                                    not_expect=[syn_folder1, syn_file1, syn_folder2, syn_file2])
@@ -158,7 +158,7 @@ def test_it_excludes_folders_by_name(syn_data, reset_download_dir):
         reset_download_dir(syn_data)
         downloader = Downloader(project.id, download_dir, with_view=with_view, excludes=[syn_folder2.name])
         downloader.start()
-        assert downloader.has_errors is False
+        assert len(downloader.errors) == 0
         assert_local_download_data(syn_data,
                                    expect=[syn_file0, syn_folder1, syn_file1],
                                    not_expect=[syn_folder2, syn_file2])
@@ -179,7 +179,7 @@ def test_it_excludes_files_by_id(syn_data, reset_download_dir):
             downloader.start()
             expected = all_syn_entities.copy()
             expected.remove(syn_file)
-            assert downloader.has_errors is False
+            assert len(downloader.errors) == 0
             assert_local_download_data(syn_data,
                                        expect=expected,
                                        not_expect=[syn_file])
@@ -188,7 +188,7 @@ def test_it_excludes_files_by_id(syn_data, reset_download_dir):
         reset_download_dir(syn_data)
         downloader = Downloader(project.id, download_dir, with_view=with_view, excludes=[f.id for f in all_syn_files])
         downloader.start()
-        assert downloader.has_errors is False
+        assert len(downloader.errors) == 0
         assert_local_download_data(syn_data,
                                    expect=all_syn_folders,
                                    not_expect=all_syn_files)
@@ -209,7 +209,7 @@ def test_it_excludes_files_by_name(syn_data, reset_download_dir):
             downloader.start()
             expected = all_syn_entities.copy()
             expected.remove(syn_file)
-            assert downloader.has_errors is False
+            assert len(downloader.errors) == 0
             assert_local_download_data(syn_data,
                                        expect=expected,
                                        not_expect=[syn_file])
@@ -218,7 +218,7 @@ def test_it_excludes_files_by_name(syn_data, reset_download_dir):
         reset_download_dir(syn_data)
         downloader = Downloader(project.id, download_dir, with_view=with_view, excludes=[f.name for f in all_syn_files])
         downloader.start()
-        assert downloader.has_errors is False
+        assert len(downloader.errors) == 0
         assert_local_download_data(syn_data,
                                    expect=all_syn_folders,
                                    not_expect=all_syn_files)
@@ -240,7 +240,7 @@ def test_it_excludes_files_by_filename(syn_data, reset_download_dir):
             downloader.start()
             expected = all_syn_entities.copy()
             expected.remove(syn_file)
-            assert downloader.has_errors is False
+            assert len(downloader.errors) == 0
             assert_local_download_data(syn_data,
                                        expect=expected,
                                        not_expect=[syn_file])
@@ -250,7 +250,7 @@ def test_it_excludes_files_by_filename(syn_data, reset_download_dir):
         downloader = Downloader(project.id, download_dir, with_view=with_view,
                                 excludes=[f._file_handle.fileName for f in all_syn_files])
         downloader.start()
-        assert downloader.has_errors is False
+        assert len(downloader.errors) == 0
         assert_local_download_data(syn_data,
                                    expect=all_syn_folders,
                                    not_expect=all_syn_files)
