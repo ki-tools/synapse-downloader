@@ -28,25 +28,21 @@ class Comparer:
         self.end_time = None
         self.total_remote_files = None
         self.remote_files_processed = 0
-        self.has_errors = False
+        self.errors = []
 
     def start(self):
         self.total_remote_files = None
         self.remote_files_processed = 0
-        self.has_errors = False
+        self.errors = []
 
         if SynapseProxy.logged_in() or SynapseProxy.login(username=self._username, password=self._password):
             AioManager.start(self._startAsync)
         else:
-            self.has_errors = True
+            self._log_error('Could not login to Synapse.')
 
         self.end_time = datetime.now()
         self._log_info('Run time: {0}'.format(self.end_time - (self.start_time or datetime.now())))
-
-        if self.has_errors:
-            logging.error('Finished with errors. See log file.')
-        else:
-            logging.info('Finished successfully.')
+        return self
 
     async def _startAsync(self):
         try:
@@ -79,7 +75,7 @@ class Comparer:
             self._log_error('Unknown error. See log file.')
 
     def _log_error(self, *msg):
-        self.has_errors = True
+        self.errors.append('\n'.join(msg))
         logging.error('\n'.join(msg))
 
     def _log_info(self, *msg):

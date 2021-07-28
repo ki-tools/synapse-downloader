@@ -1,5 +1,11 @@
 # Change Log
 
+## Version 0.0.6 (2021-07-28)
+
+### Added
+
+- Added system exit codes.
+
 ## Version 0.0.5 (2021-06-22)
 
 ### Added

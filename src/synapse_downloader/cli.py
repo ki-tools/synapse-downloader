@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import logging
 from datetime import datetime
@@ -9,21 +10,21 @@ from ._version import __version__
 
 
 def _start_download(args):
-    Downloader(args.entity_id,
-               args.download_path,
-               args.exclude,
-               with_view=args.with_view,
-               username=args.username,
-               password=args.password).start()
+    return Downloader(args.entity_id,
+                      args.download_path,
+                      args.exclude,
+                      with_view=args.with_view,
+                      username=args.username,
+                      password=args.password).start()
 
 
 def _start_compare(args):
-    Comparer(args.entity_id,
-             args.download_path,
-             with_view=args.with_view,
-             ignores=args.compare_ignore,
-             username=args.username,
-             password=args.password).start()
+    return Comparer(args.entity_id,
+                    args.download_path,
+                    with_view=args.with_view,
+                    ignores=args.compare_ignore,
+                    username=args.username,
+                    password=args.password).start()
 
 
 def main(args=None):
@@ -115,14 +116,34 @@ def main(args=None):
         SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT = args.download_timeout
         logging.info('Download timeout set to: {0}'.format(SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT))
 
-    if args.compare:
-        _start_compare(args)
-    else:
-        _start_download(args)
-        if args.with_compare:
-            _start_compare(args)
+    try:
+        cmds = []
+        if args.compare:
+            cmds.append(_start_compare(args))
+        else:
+            cmds.append(_start_download(args))
+            if args.with_compare:
+                cmds.append(_start_compare(args))
 
-    print('Output logged to: {0}'.format(log_filename))
+        all_errors = []
+        for cmd in cmds:
+            if len(cmd.errors):
+                all_errors += cmd.errors
+
+        if all_errors:
+            logging.error('Finished with errors.')
+            for error in cmd.errors:
+                print(error)
+            print('Output logged to: {0}'.format(log_filename))
+            sys.exit(1)
+        else:
+            logging.info('Finished successfully.')
+            print('Output logged to: {0}'.format(log_filename))
+            sys.exit(0)
+    except Exception as ex:
+        logging.error(ex)
+        print('Output logged to: {0}'.format(log_filename))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

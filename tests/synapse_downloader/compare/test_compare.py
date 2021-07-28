@@ -46,7 +46,7 @@ def test_it_compares_everything(syn_data):
 
     comparer = Comparer(project.id, source_dir)
     comparer.start()
-    assert comparer.has_errors is False
+    assert len(comparer.errors) == 0
 
 
 def test_it_compares_everything_with_entity_view(syn_data, capsys):
@@ -55,7 +55,7 @@ def test_it_compares_everything_with_entity_view(syn_data, capsys):
 
     comparer = Comparer(project.id, source_dir)
     comparer.start()
-    assert comparer.has_errors is False
+    assert len(comparer.errors) == 0
     # TODO: Figure out how to test the view was used.
 
 # TODO: test comparing files of: 'concreteType': 'org.sagebionetworks.repo.model.file.ExternalFileHandle'
