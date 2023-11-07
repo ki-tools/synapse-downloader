@@ -1,17 +1,20 @@
 import pytest
-import src.synapse_downloader.cli as cli
-from src.synapse_downloader.download import Downloader
-from src.synapse_downloader.compare import Comparer
+import synapse_downloader.cli as cli
+from synapse_downloader.commands.download import Downloader
+from synapse_downloader.commands.sync_from_synapse import SyncFromSynapse
 
 
-def test_download_with_compare_cli(mocker):
-    args = ['', 'syn123', '/tmp', '-e', 'syn1234', '-u', 'user', '-p', 'pass', '-ll', 'DEBUG', '-ld', '/tmp/logs',
-            '-dt', '30', '-w', '-wc', '-ci', 'syn12345']
+def test_download_command_as_default(mocker):
+    args = ['<prog>',
+            'syn123',
+            '/tmp',
+            '--exclude', 'syn1234',
+            '--log-dir', '/tmp',
+            '--log-level', 'DEBUG'
+            ]
     mocker.patch('sys.argv', args)
-    mocker.patch('src.synapse_downloader.download.Downloader.start')
-    mocker.patch('src.synapse_downloader.compare.Comparer.start')
+    mocker.patch('src.synapse_downloader.commands.download.Downloader.execute')
     mock_init_download = mocker.spy(Downloader, '__init__')
-    mock_init_compare = mocker.spy(Comparer, '__init__')
 
     with pytest.raises(SystemExit):
         cli.main()
@@ -19,41 +22,101 @@ def test_download_with_compare_cli(mocker):
     mock_init_download.assert_called_once_with(mocker.ANY,
                                                'syn123',
                                                '/tmp',
-                                               excludes=['syn1234'],
-                                               with_view=True,
-                                               username='user',
-                                               password='pass'
+                                               download=True,
+                                               compare=False,
+                                               excludes=['syn1234']
                                                )
 
-    mock_init_compare.assert_called_once_with(mocker.ANY,
-                                              'syn123',
-                                              '/tmp',
-                                              with_view=True,
-                                              ignores=['syn12345'],
-                                              username='user',
-                                              password='pass'
-                                              )
 
-
-def test_compare_cli(mocker):
-    args = ['', 'syn123', '/tmp', '-e', 'syn1234', '-u', 'user', '-p', 'pass', '-ll', 'DEBUG', '-ld', '/tmp/logs',
-            '-dt', '30', '-w', '-wc', '-ci', 'syn12345', '-c']
+def test_download_command(mocker):
+    args = ['<prog>',
+            'download',
+            'syn123',
+            '/tmp',
+            '--exclude', 'syn1234',
+            '--log-dir', '/tmp',
+            '--log-level', 'DEBUG'
+            ]
     mocker.patch('sys.argv', args)
-    mocker.patch('src.synapse_downloader.download.Downloader.start')
-    mocker.patch('src.synapse_downloader.compare.Comparer.start')
+    mocker.patch('synapse_downloader.commands.download.Downloader.execute')
     mock_init_download = mocker.spy(Downloader, '__init__')
-    mock_init_compare = mocker.spy(Comparer, '__init__')
 
     with pytest.raises(SystemExit):
         cli.main()
 
-    mock_init_download.assert_not_called()
+    mock_init_download.assert_called_once_with(mocker.ANY,
+                                               'syn123',
+                                               '/tmp',
+                                               download=True,
+                                               compare=False,
+                                               excludes=['syn1234']
+                                               )
 
-    mock_init_compare.assert_called_once_with(mocker.ANY,
-                                              'syn123',
-                                              '/tmp',
-                                              with_view=True,
-                                              ignores=['syn12345'],
-                                              username='user',
-                                              password='pass'
-                                              )
+
+def test_download_command_with_compare(mocker):
+    args = ['<prog>',
+            'download',
+            'syn123',
+            '/tmp',
+            '--exclude', 'syn1234',
+            '--with-compare',
+            '--log-dir', '/tmp',
+            '--log-level', 'DEBUG'
+            ]
+    mocker.patch('sys.argv', args)
+    mocker.patch('src.synapse_downloader.commands.download.Downloader.execute')
+    mock_init_download = mocker.spy(Downloader, '__init__')
+
+    with pytest.raises(SystemExit):
+        cli.main()
+
+    mock_init_download.assert_called_once_with(mocker.ANY,
+                                               'syn123',
+                                               '/tmp',
+                                               download=True,
+                                               compare=True,
+                                               excludes=['syn1234']
+                                               )
+
+
+def test_download_command_with_compare(mocker):
+    args = ['<prog>',
+            'compare',
+            'syn123',
+            '/tmp',
+            '--exclude', 'syn1234',
+            '--log-dir', '/tmp',
+            '--log-level', 'DEBUG'
+            ]
+    mocker.patch('sys.argv', args)
+    mocker.patch('src.synapse_downloader.commands.download.Downloader.execute')
+    mock_init_download = mocker.spy(Downloader, '__init__')
+
+    with pytest.raises(SystemExit):
+        cli.main()
+
+    mock_init_download.assert_called_once_with(mocker.ANY,
+                                               'syn123',
+                                               '/tmp',
+                                               download=False,
+                                               compare=True,
+                                               excludes=['syn1234']
+                                               )
+
+
+def test_sync_from_synapse_command(mocker):
+    args = ['<prog>',
+            'sync-from-synapse',
+            'syn123',
+            '/tmp',
+            '--log-dir', '/tmp',
+            '--log-level', 'DEBUG'
+            ]
+    mocker.patch('sys.argv', args)
+    mocker.patch('src.synapse_downloader.commands.sync_from_synapse.SyncFromSynapse.execute')
+    mock_init_download = mocker.spy(SyncFromSynapse, '__init__')
+
+    with pytest.raises(SystemExit):
+        cli.main()
+
+    mock_init_download.assert_called_once_with(mocker.ANY, 'syn123', '/tmp')

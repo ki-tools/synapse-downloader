@@ -12,14 +12,16 @@ coverage = "*"
 coveralls = "*"
 pytest-mock = "*"
 pytest-pylint = "*"
-pylint = "*"
+pylint = "<3.0.0"
 wheel = "*"
 autopep8 = "*"
+tox = "*"
+python-dotenv = "*"
+synapse_test_helper = ">=0.0.3"
 
 [packages]
-synapseclient = "*"
-aiohttp = ">=3.7.4"
-aiofiles = "*"
+synapseclient = ">=2.3.1,<3.0.0"
+synapsis = ">=0.0.7"
 
 [requires]
-python_version = "3.7"
+python_version = "3.10"

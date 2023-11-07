@@ -1,14 +1,41 @@
 import os
-import hashlib
-import aiofiles
+import re
 import math
 import pathlib
+import logging
+from .env import Env
 
 
 class Utils:
     KB = 1024
     MB = KB * KB
     CHUNK_SIZE = 10 * MB
+
+    @staticmethod
+    def os_name():
+        return os.name
+
+    @staticmethod
+    def patch():
+        """Applies patches to packages"""
+        if Env.SYNTOOLS_PATCH() is True:
+            # On windows this method will lowercase all directory and file names.
+            # We do not want this since it changes the data and breaks uploading and comparisons.
+            if Utils.os_name() == 'nt':
+                from synapseclient.core import utils
+                logging.info('Patching synapseclient.', console=True)
+
+                def normalize_path(path):
+                    """Transforms a path into an absolute path with forward slashes only."""
+                    if path is None:
+                        return None
+                    return re.sub(r'\\', '/', os.path.abspath(path))
+
+                utils.normalize_path = normalize_path
+
+    @staticmethod
+    def real_path(path):
+        return str(pathlib.Path(path).resolve())
 
     @staticmethod
     def app_dir():
@@ -47,30 +74,6 @@ class Utils:
         if not os.path.isdir(local_path):
             os.makedirs(local_path)
 
-    @staticmethod
-    def split_chunk(list, chunk_size):
-        """Yield successive n-sized chunks from a list.
-
-        Args:
-            list: The list to chunk.
-            chunk_size: The max chunk size.
-
-        Returns:
-            List of lists.
-        """
-        for i in range(0, len(list), chunk_size):
-            yield list[i:i + chunk_size]
-
-    # Holds the last string that was printed
-    __last_print_inplace_len = 0
-
-    @staticmethod
-    def print_inplace(msg):
-        # Clear the line. Using this method so it works on Windows too.
-        print(' ' * Utils.__last_print_inplace_len, end='\r')
-        print(msg, end='\r')
-        Utils.__last_print_inplace_len = len(msg)
-
     # Hold the names for pretty printing file sizes.
     PRETTY_SIZE_NAMES = ("Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
 
@@ -87,13 +90,12 @@ class Utils:
             s = 0
         return '{0} {1}'.format(s, Utils.PRETTY_SIZE_NAMES[i])
 
+    # Holds the last string that was printed
+    __last_print_inplace_len = 0
+
     @staticmethod
-    async def get_md5(local_path):
-        md5 = hashlib.md5()
-        async with aiofiles.open(local_path, mode='rb') as fd:
-            while True:
-                chunk = await fd.read(Utils.CHUNK_SIZE)
-                if not chunk:
-                    break
-                md5.update(chunk)
-        return md5.hexdigest()
+    def print_inplace(msg):
+        # Clear the line. Using this method so it works on Windows too.
+        print(' ' * Utils.__last_print_inplace_len, end='\r')
+        print(msg, end='\r')
+        Utils.__last_print_inplace_len = len(msg)

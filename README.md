@@ -7,8 +7,8 @@ Utility for downloading large datasets from Synapse.
 
 ## Dependencies
 
-- [Python3.7](https://www.python.org/)
-- A [Synapse](https://www.synapse.org/) account with a username/password. Authentication through a 3rd party (.e.g., Google) will not work, you must have a Synapse user/pass for the [API to authenticate](http://docs.synapse.org/python/#connecting-to-synapse).
+- [Python3.10+](https://www.python.org/)
+- A [Synapse](https://www.synapse.org/) account with an auth token.
 
 ## Install
 
@@ -18,58 +18,161 @@ pip install synapse-downloader
 
 ## Configuration
 
-Your Synapse credential can be provided on the command line (`--username`, `--password`) or via environment variables.
+### Environment Variables
 
-```bash
-SYNAPSE_USERNAME=your-synapse-username
-SYNAPSE_PASSWORD=your-synapse-password
+No configuration is necessary if using environment variables or the default synapse config file.
+
+For user/pass, set:
+
+```shell
+SYNAPSE_USERNAME=
+SYNAPSE_PASSWORD=
+```
+
+For auth token, set:
+
+```shell
+SYNAPSE_AUTH_TOKEN=
+```
+
+For Synapse Config file:
+
+Have a valid config file in: `~/.synapseConfig`
+
+Or, have the environment variable set: `SYNAPSE_CONFIG_FILE=`
+
+### Command Line Arguments
+
+```text
+options:
+  -u USERNAME, --username USERNAME
+                        Synapse username.
+  -p PASSWORD, --password PASSWORD
+                        Synapse password.
+  --auth-token AUTH_TOKEN
+                        Synapse auth token.
+  --synapse-config SYNAPSE_CONFIG
+                        Path to Synapse configuration file.
 ```
 
 ## Usage
 
 ```text
-usage: synapse-downloader [-h] [-e [EXCLUDE]] [-u USERNAME] [-p PASSWORD]
-                          [-ll LOG_LEVEL] [-ld LOG_DIR] [-dt DOWNLOAD_TIMEOUT]
-                          [-w] [-wc] [-c] [-ci [COMPARE_IGNORE]]
-                          entity-id download-path
+usage: synapse-downloader [-h] [--version] {download,compare,sync-from-synapse} ...
+
+Synapse Downloader
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit
+
+Commands:
+  {download,compare,sync-from-synapse}
+    download            Download items from Synapse to a local directory. Default command.
+    compare             Compare items in Synapse to a local directory.
+    sync-from-synapse   Download items from Synapse to a local directory using the syncFromSynapse method.
+```
+
+### Download
+
+```text
+usage: synapse-downloader download [-h] [-u USERNAME] [-p PASSWORD] [--auth-token AUTH_TOKEN]
+                                   [--synapse-config SYNAPSE_CONFIG] [-ll LOG_LEVEL] [-ld LOG_DIR] [-e [EXCLUDE]] [-wc]
+                                   entity-id local-path
 
 positional arguments:
-  entity-id             The ID of the Synapse entity to download or compare
-                        (Project, Folder or File).
-  download-path         The local path to save the files to or to compare.
+  entity-id             The ID of the Synapse entity to download (Project, Folder or File).
+  local-path            The local path to save the files to.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -e [EXCLUDE], --exclude [EXCLUDE]
-                        Items to exclude from download. Synapse IDs or names
-                        (names are case-sensitive).
   -u USERNAME, --username USERNAME
                         Synapse username.
   -p PASSWORD, --password PASSWORD
                         Synapse password.
+  --auth-token AUTH_TOKEN
+                        Synapse auth token.
+  --synapse-config SYNAPSE_CONFIG
+                        Path to Synapse configuration file.
   -ll LOG_LEVEL, --log-level LOG_LEVEL
                         Set the logging level.
   -ld LOG_DIR, --log-dir LOG_DIR
                         Set the directory where the log file will be written.
-  -dt DOWNLOAD_TIMEOUT, --download-timeout DOWNLOAD_TIMEOUT
-                        Set the maximum time (in seconds) a file can download
-                        before it is canceled.
-  -w, --with-view       Use an entity view for loading file info. Fastest for
-                        large projects.
-  -wc, --with-compare   Run the comparison after downloading everything.
-  -c, --compare         Compare a local directory against a remote project or
-                        folder.
-  -ci [COMPARE_IGNORE], --compare-ignore [COMPARE_IGNORE]
-                        Path to directories or files to ignore when comparing.
+  -e [EXCLUDE], --exclude [EXCLUDE]
+                        Items to exclude from download. Synapse IDs, names, or filenames (names are case-sensitive).
+  -wc, --with-compare   Run compare after downloading everything.
+
+```
+
+### Compare
+
+```text
+usage: synapse-downloader compare [-h] [-u USERNAME] [-p PASSWORD] [--auth-token AUTH_TOKEN] [--synapse-config SYNAPSE_CONFIG]
+                                  [-ll LOG_LEVEL] [-ld LOG_DIR] [-e [EXCLUDE]]
+                                  entity-id local-path
+
+positional arguments:
+  entity-id             The ID of the Synapse entity to compare (Project, Folder or File).
+  local-path            The local path to compare.
+
+options:
+  -h, --help            show this help message and exit
+  -u USERNAME, --username USERNAME
+                        Synapse username.
+  -p PASSWORD, --password PASSWORD
+                        Synapse password.
+  --auth-token AUTH_TOKEN
+                        Synapse auth token.
+  --synapse-config SYNAPSE_CONFIG
+                        Path to Synapse configuration file.
+  -ll LOG_LEVEL, --log-level LOG_LEVEL
+                        Set the logging level.
+  -ld LOG_DIR, --log-dir LOG_DIR
+                        Set the directory where the log file will be written.
+  -e [EXCLUDE], --exclude [EXCLUDE]
+                        Items to exclude from compare. Synapse IDs, names, or filenames (names are case-sensitive).
+```
+
+### Sync From Synapse
+
+```text
+usage: synapse-downloader sync-from-synapse [-h] [-u USERNAME] [-p PASSWORD] [--auth-token AUTH_TOKEN]
+                                            [--synapse-config SYNAPSE_CONFIG] [-ll LOG_LEVEL] [-ld LOG_DIR]
+                                            entity-id local-path
+
+positional arguments:
+  entity-id             The ID of the Synapse entity to download (Project, Folder or File).
+  local-path            The local path to save the files to.
+
+options:
+  -h, --help            show this help message and exit
+  -u USERNAME, --username USERNAME
+                        Synapse username.
+  -p PASSWORD, --password PASSWORD
+                        Synapse password.
+  --auth-token AUTH_TOKEN
+                        Synapse auth token.
+  --synapse-config SYNAPSE_CONFIG
+                        Path to Synapse configuration file.
+  -ll LOG_LEVEL, --log-level LOG_LEVEL
+                        Set the logging level.
+  -ld LOG_DIR, --log-dir LOG_DIR
+                        Set the directory where the log file will be written.
 ```
 
 ## Development Setup
 
 ```bash
-pipenv --three
+pipenv --python 3.10
 pipenv shell
 make pip_install
 make build
 make install_local
 ```
+
 See [Makefile](Makefile) for all commands.
+
+Run tests:
+
+1. Rename `.env.template` to `.env` and set the variables in the file.
+2. Run `make test` or `tox`

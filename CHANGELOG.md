@@ -1,5 +1,14 @@
 # Change Log
 
+## Version 0.2.0 (2023-11-07)
+
+### Changes
+
+- Only supports Python 3.10+.
+- Refactor code to improve speed.
+- Added `sync-from-synapse` option.
+- Changed command line arguments.
+
 ## Version 0.0.6 (2021-07-28)
 
 ### Added

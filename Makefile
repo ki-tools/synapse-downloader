@@ -27,16 +27,6 @@ install_local:
 	pip install -e .
 
 
-.PHONY: install_test
-install_test:
-	pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple synapse-downloader
-
-
-.PHONY: publish_test
-publish_test: build
-	twine upload --repository-url https://test.pypi.org/legacy/ dist/*
-
-
 .PHONY: publish
 publish: build
 	twine upload dist/*

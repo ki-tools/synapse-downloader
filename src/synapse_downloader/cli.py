@@ -2,147 +2,109 @@ import os
 import sys
 import argparse
 import logging
+import asyncio
 from datetime import datetime
-from .download import Downloader
-from .core import Utils, SynapseProxy
-from .compare.comparer import Comparer
+from .core import Utils
+from .commands.download import cli as download_cli
+from .commands.sync_from_synapse import cli as sync_from_synapse_cli
 from ._version import __version__
+from synapsis import cli as synapsis_cli
+
+ALL_COMMANDS = [download_cli, sync_from_synapse_cli]
 
 
-def _start_download(args):
-    return Downloader(args.entity_id,
-                      args.download_path,
-                      args.exclude,
-                      with_view=args.with_view,
-                      username=args.username,
-                      password=args.password).start()
+class LogFilter(logging.Filter):
+    FILTERS = [
+        'Connection pool is full, discarding connection:'
+    ]
+
+    def filter(self, record):
+        for filter in self.FILTERS:
+            if filter in record.msg:
+                return False
+        return True
 
 
-def _start_compare(args):
-    return Comparer(args.entity_id,
-                    args.download_path,
-                    with_view=args.with_view,
-                    ignores=args.compare_ignore,
-                    username=args.username,
-                    password=args.password).start()
+def main():
+    Utils.patch()
+    main_parser = argparse.ArgumentParser(description='Synapse Downloader')
+    main_parser.add_argument('--version', action='version', version='%(prog)s {0}'.format(__version__))
 
+    shared_parser = argparse.ArgumentParser(add_help=False)
+    synapsis_cli.inject(shared_parser)
+    shared_parser.add_argument('-ll', '--log-level', help='Set the logging level.', default='INFO')
+    shared_parser.add_argument('-ld', '--log-dir', help='Set the directory where the log file will be written.')
 
-def main(args=None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--version', action='version', version='%(prog)s {0}'.format(__version__))
-    parser.add_argument('entity_id',
-                        metavar='entity-id',
-                        help='The ID of the Synapse entity to download or compare (Project, Folder or File).')
+    subparsers = main_parser.add_subparsers(title='Commands', dest='command')
+    for command in ALL_COMMANDS:
+        command.create(subparsers, [shared_parser])
 
-    parser.add_argument('download_path',
-                        metavar='download-path',
-                        help='The local path to save the files to or to compare.')
+    if len(sys.argv) >= 2:
+        first_arg = sys.argv[1]
+        if first_arg not in ['download', 'compare', 'sync-from-synapse'] and first_arg not in ['-h', '--help',
+                                                                                               '-v', '--version']:
+            sys.argv.insert(1, 'download')
 
-    parser.add_argument('-e', '--exclude',
-                        help='Items to exclude from download. Synapse IDs or names (names are case-sensitive).',
-                        action='append', nargs='?')
+    cmd_args = main_parser.parse_args()
 
-    parser.add_argument('-u', '--username',
-                        help='Synapse username.',
-                        default=None)
+    if '_new_command' in cmd_args:
+        log_level = getattr(logging, cmd_args.log_level.upper())
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        log_filename = '{0}.log'.format(timestamp)
 
-    parser.add_argument('-p', '--password',
-                        help='Synapse password.',
-                        default=None)
-
-    parser.add_argument('-ll', '--log-level',
-                        help='Set the logging level.',
-                        default='INFO')
-
-    parser.add_argument('-ld', '--log-dir',
-                        help='Set the directory where the log file will be written.')
-
-    parser.add_argument('-dt', '--download-timeout',
-                        help='Set the maximum time (in seconds) a file can download before it is canceled.',
-                        type=int,
-                        default=SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT)
-
-    parser.add_argument('-w', '--with-view',
-                        help='Use an entity view for loading file info. Fastest for large projects.',
-                        default=False,
-                        action='store_true')
-
-    parser.add_argument('-wc', '--with-compare',
-                        help='Run the comparison after downloading everything.',
-                        default=False,
-                        action='store_true')
-
-    # Comparing.
-    parser.add_argument('-c', '--compare',
-                        help='Compare a local directory against a remote project or folder.',
-                        default=False,
-                        action='store_true')
-
-    parser.add_argument('-ci', '--compare-ignore',
-                        help='Path to directories or files to ignore when comparing.',
-                        action='append',
-                        nargs='?')
-
-    args = parser.parse_args(args)
-
-    log_level = getattr(logging, args.log_level.upper())
-
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-    log_filename = '{0}.log'.format(timestamp)
-
-    if args.log_dir:
-        log_filename = os.path.join(Utils.expand_path(args.log_dir), log_filename)
-    else:
-        log_filename = os.path.join(Utils.app_log_dir(), log_filename)
-
-    Utils.ensure_dirs(os.path.dirname(log_filename))
-
-    logging.basicConfig(
-        filename=log_filename,
-        filemode='w',
-        format='%(asctime)s %(levelname)s: %(message)s',
-        level=log_level
-    )
-
-    # Add console logging.
-    console = logging.StreamHandler()
-    console.setLevel(log_level)
-    console.setFormatter(logging.Formatter('%(message)s'))
-    logging.getLogger().addHandler(console)
-
-    print('Logging output to: {0}'.format(log_filename))
-
-    if args.download_timeout != SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT:
-        SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT = args.download_timeout
-        logging.info('Download timeout set to: {0}'.format(SynapseProxy.Aio.FILE_DOWNLOAD_TIMEOUT))
-
-    try:
-        cmds = []
-        if args.compare:
-            cmds.append(_start_compare(args))
+        if cmd_args.log_dir:
+            log_filename = os.path.join(Utils.expand_path(cmd_args.log_dir), log_filename)
         else:
-            cmds.append(_start_download(args))
-            if args.with_compare:
-                cmds.append(_start_compare(args))
+            log_filename = os.path.join(Utils.app_log_dir(), log_filename)
 
-        all_errors = []
-        for cmd in cmds:
-            if len(cmd.errors):
-                all_errors += cmd.errors
+        Utils.ensure_dirs(os.path.dirname(log_filename))
 
-        if all_errors:
+        logging.basicConfig(
+            filename=log_filename,
+            filemode='w',
+            format='%(asctime)s %(levelname)s: %(message)s',
+            level=log_level
+        )
+
+        # Add console logging.
+        console = logging.StreamHandler(stream=sys.stdout)
+        console.setLevel(log_level)
+        console.setFormatter(logging.Formatter('%(message)s'))
+        logging.getLogger().addHandler(console)
+
+        # TODO: Fix "Connection pool is full, discarding connection:" and remove the log filter.
+        log_filter = LogFilter()
+        for logger in [logging.getLogger(name) for name in logging.root.manager.loggerDict]:
+            logger.addFilter(log_filter)
+
+        print('Logging output to: {0}'.format(log_filename))
+        exit_code = 1
+        try:
+            synapsis_cli.configure(cmd_args, synapse_args={'multi_threaded': False}, login=True)
+            cmd = cmd_args._new_command(cmd_args)
+            try:
+                asyncio.run(cmd.execute())
+            except KeyboardInterrupt:
+                cmd.abort()
+
+            print('')
+            if cmd.errors:
+                exit_code = 1
+                logging.error('Finished with errors:')
+                for error in cmd.errors:
+                    logging.error(' - {0}'.format(error))
+            else:
+                exit_code = 0
+                logging.info('Finished Successfully.')
+        except Exception as ex:
+            exit_code = 1
+            logging.error(ex)
             logging.error('Finished with errors.')
-            for error in cmd.errors:
-                print(error)
-            print('Output logged to: {0}'.format(log_filename))
-            sys.exit(1)
-        else:
-            logging.info('Finished successfully.')
-            print('Output logged to: {0}'.format(log_filename))
-            sys.exit(0)
-    except Exception as ex:
-        logging.error(ex)
+
         print('Output logged to: {0}'.format(log_filename))
+        sys.exit(exit_code)
+    else:
+        main_parser.print_help()
         sys.exit(1)
 
 
